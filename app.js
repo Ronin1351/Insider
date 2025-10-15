@@ -1,44 +1,26 @@
 /**
  * Insider Trading Tracker Application
- * Comprehensive insider trading data display
+ * Multi-tab dashboard with insider trades and earnings calendar
  */
 
 // ============================================================================
-// STATE MANAGEMENT
+// STATE
 // ============================================================================
 
 const state = {
   allTrades: [],
-  currentSort: {
-    column: 'filingDate',
-    direction: 'desc'
-  },
-  filters: {
+  filteredTrades: [],
+  currentTab: 'dashboard',
+  dashboardFilters: {
+    ticker: '',
+    insider: '',
+    amount: 'all',
+    type: 'all', // Changed from array to single value
     dateFrom: '',
     dateTo: ''
   },
+  currentSort: { column: 'filingDate', direction: 'desc' },
   isLoading: false
-};
-
-// ============================================================================
-// DOM ELEMENT REFERENCES
-// ============================================================================
-
-const elements = {
-  refreshBtn: null,
-  tableBody: null,
-  table: null,
-  loading: null,
-  errorMessage: null,
-  emptyState: null,
-  lastUpdated: null,
-  filterDateFrom: null,
-  filterDateTo: null,
-  tableHeaders: null,
-  statsBar: null,
-  statTotal: null,
-  statBuyVolume: null,
-  statSellVolume: null
 };
 
 // ============================================================================
@@ -47,10 +29,73 @@ const elements = {
 
 const CONFIG = {
   API_ENDPOINT: '/api/insider-trades',
+  EARNINGS_ENDPOINT: '/api/earnings',
   MAX_RETRIES: 3,
-  RETRY_DELAY: 1000,
-  DEBOUNCE_DELAY: 300
+  RETRY_DELAY: 1000
 };
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+function formatCurrency(amount) {
+  if (!amount) return '$0.00';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2
+  }).format(amount);
+}
+
+function formatCurrencyShort(amount) {
+  if (!amount) return '$0';
+  const abs = Math.abs(amount);
+  if (abs >= 1e9) return '$' + (amount / 1e9).toFixed(2) + 'B';
+  if (abs >= 1e6) return '$' + (amount / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return '$' + (amount / 1e3).toFixed(2) + 'K';
+  return formatCurrency(amount);
+}
+
+function formatNumber(num) {
+  if (!num && num !== 0) return '0';
+  return new Intl.NumberFormat('en-US').format(num);
+}
+
+function formatDate(dateString) {
+  if (!dateString) return 'N/A';
+  try {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+function calculateTransactionValue(shares, price) {
+  return Math.abs(shares || 0) * (price || 0);
+}
+
+function calculateOwnedAfter(shares, change, transactionCode) {
+  // Finnhub's 'change' field is the change in ownership
+  // For accurate calculation, we need to work backwards
+  if (change === null || change === undefined) return null;
+  
+  // If change is provided as shares
+  return Math.abs(change);
+}
+
+function calculateChangePercent(shares, ownedBefore) {
+  // Calculate percentage change: (shares traded / owned before) * 100
+  if (!ownedBefore || ownedBefore === 0) return null;
+  return (shares / ownedBefore) * 100;
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 // ============================================================================
 // API FUNCTIONS
@@ -59,22 +104,17 @@ const CONFIG = {
 async function fetchInsiderTrades(retryCount = 0) {
   try {
     const params = new URLSearchParams();
-    if (state.filters.dateFrom) params.append('from', state.filters.dateFrom);
-    if (state.filters.dateTo) params.append('to', state.filters.dateTo);
+    const from = state.dashboardFilters.dateFrom || getDefaultFromDate();
+    const to = state.dashboardFilters.dateTo || getDefaultToDate();
     
-    const url = `${CONFIG.API_ENDPOINT}${params.toString() ? '?' + params.toString() : ''}`;
+    params.append('from', from);
+    params.append('to', to);
     
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    const response = await fetch(`${CONFIG.API_ENDPOINT}?${params}`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     
     const data = await response.json();
-    
-    if (!data.success) {
-      throw new Error(data.error || 'API request failed');
-    }
+    if (!data.success) throw new Error(data.error || 'API request failed');
     
     return data;
   } catch (error) {
@@ -86,500 +126,427 @@ async function fetchInsiderTrades(retryCount = 0) {
   }
 }
 
-async function loadData() {
+async function fetchEarningsCalendar() {
+  try {
+    const params = new URLSearchParams();
+    params.append('from', getDefaultFromDate());
+    params.append('to', getDefaultToDate());
+    
+    const response = await fetch(`${CONFIG.EARNINGS_ENDPOINT}?${params}`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    const data = await response.json();
+    if (!data.success) throw new Error(data.error || 'API request failed');
+    
+    return data;
+  } catch (error) {
+    console.error('Earnings fetch error:', error);
+    throw error;
+  }
+}
+
+function getDefaultFromDate() {
+  const date = new Date();
+  date.setDate(date.getDate() - 2); // Last 48 hours
+  return date.toISOString().split('T')[0];
+}
+
+function getDefaultToDate() {
+  return new Date().toISOString().split('T')[0];
+}
+
+// ============================================================================
+// DATA LOADING
+// ============================================================================
+
+async function loadInsiderTrades() {
   if (state.isLoading) return;
   
   try {
     state.isLoading = true;
     showLoading();
-    hideError();
-    hideEmptyState();
-    hideStats();
     
     const response = await fetchInsiderTrades();
+    state.allTrades = response.data || [];
     
-    if (!response.data || !Array.isArray(response.data)) {
-      throw new Error('Invalid data format received');
-    }
-    
-    state.allTrades = response.data;
-    renderTable(state.allTrades);
-    updateStatistics(state.allTrades);
-    updateTimestamp(response.timestamp);
-    
-    if (state.allTrades.length === 0) {
-      showEmptyState();
-    }
+    applyDashboardFilters();
+    renderDashboardCharts();
+    renderTransactionsTable();
+    updateStats();
     
   } catch (error) {
-    console.error('Error loading data:', error);
-    showError(getErrorMessage(error));
+    console.error('Error loading trades:', error);
+    showError(error.message);
   } finally {
     state.isLoading = false;
     hideLoading();
   }
 }
 
-// ============================================================================
-// DATA PROCESSING & FORMATTING
-// ============================================================================
-
-function formatCurrency(amount) {
-  if (amount === null || amount === undefined || isNaN(amount)) {
-    return '$0.00';
-  }
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(amount);
-}
-
-function formatCurrencyShort(amount) {
-  if (amount === null || amount === undefined || isNaN(amount)) {
-    return '$0';
-  }
-  
-  const absAmount = Math.abs(amount);
-  if (absAmount >= 1e9) {
-    return '$' + (amount / 1e9).toFixed(2) + 'B';
-  } else if (absAmount >= 1e6) {
-    return '$' + (amount / 1e6).toFixed(2) + 'M';
-  } else if (absAmount >= 1e3) {
-    return '$' + (amount / 1e3).toFixed(2) + 'K';
-  }
-  return formatCurrency(amount);
-}
-
-function formatNumber(num) {
-  if (num === null || num === undefined || isNaN(num)) {
-    return '0';
-  }
-  return new Intl.NumberFormat('en-US').format(num);
-}
-
-function formatDate(dateString) {
-  if (!dateString) return 'N/A';
-  
+async function loadEarningsCalendar() {
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    document.getElementById('earnings-loading').style.display = 'flex';
+    
+    const response = await fetchEarningsCalendar();
+    renderEarningsTable(response.data || []);
+    
   } catch (error) {
-    return dateString;
+    console.error('Error loading earnings:', error);
+  } finally {
+    document.getElementById('earnings-loading').style.display = 'none';
   }
-}
-
-function formatChangeValue(change) {
-  if (change === null || change === undefined || isNaN(change)) {
-    return '0';
-  }
-  
-  // Format as absolute number with sign
-  const sign = change >= 0 ? '+' : '';
-  return sign + formatNumber(Math.round(change));
-}
-
-function calculateTransactionValue(shares, price) {
-  if (!shares || !price) return 0;
-  return Math.abs(shares) * price;
-}
-
-function calculateOwnedAfter(shares, change) {
-  // If change represents the ownership after transaction
-  // Some APIs return this directly, others require calculation
-  if (change === null || change === undefined) return null;
-  
-  // Return the absolute value as shares owned
-  return Math.abs(change);
-}
-
-function getErrorMessage(error) {
-  if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-    return 'Unable to connect. Please check your connection.';
-  }
-  if (error.message.includes('rate limit')) {
-    return 'API rate limit exceeded. Please try again later.';
-  }
-  if (error.message.includes('Invalid data format')) {
-    return error.message;
-  }
-  return error.message || 'An unexpected error occurred. Please try again.';
 }
 
 // ============================================================================
-// STATISTICS CALCULATION
+// FILTERING
 // ============================================================================
 
-function updateStatistics(trades) {
-  if (!trades || trades.length === 0) {
-    hideStats();
+function applyDashboardFilters() {
+  let filtered = [...state.allTrades];
+  
+  // Ticker filter
+  if (state.dashboardFilters.ticker) {
+    const search = state.dashboardFilters.ticker.toLowerCase();
+    filtered = filtered.filter(t => t.symbol.toLowerCase().includes(search));
+  }
+  
+  // Insider filter
+  if (state.dashboardFilters.insider) {
+    const search = state.dashboardFilters.insider.toLowerCase();
+    filtered = filtered.filter(t => t.personName.toLowerCase().includes(search));
+  }
+  
+  // Amount filter
+  if (state.dashboardFilters.amount !== 'all') {
+    filtered = filtered.filter(t => {
+      const value = calculateTransactionValue(t.share, t.transactionPrice);
+      switch (state.dashboardFilters.amount) {
+        case '1-100k': return value >= 1 && value <= 100000;
+        case '100k-1m': return value > 100000 && value <= 1000000;
+        case '1m+': return value > 1000000;
+        default: return true;
+      }
+    });
+  }
+  
+  // Type filter (single select)
+  if (state.dashboardFilters.type !== 'all') {
+    filtered = filtered.filter(t => {
+      const isBuy = t.transactionCode === 'P';
+      if (state.dashboardFilters.type === 'buy') return isBuy;
+      if (state.dashboardFilters.type === 'sell') return !isBuy;
+      return true;
+    });
+  }
+  
+  state.filteredTrades = filtered;
+}
+
+// ============================================================================
+// DASHBOARD CHARTS
+// ============================================================================
+
+function renderDashboardCharts() {
+  const buys = state.filteredTrades
+    .filter(t => t.transactionCode === 'P')
+    .sort((a, b) => calculateTransactionValue(b.share, b.transactionPrice) - 
+                    calculateTransactionValue(a.share, a.transactionPrice))
+    .slice(0, 10);
+  
+  const sells = state.filteredTrades
+    .filter(t => t.transactionCode === 'S')
+    .sort((a, b) => calculateTransactionValue(b.share, b.transactionPrice) - 
+                    calculateTransactionValue(a.share, a.transactionPrice))
+    .slice(0, 10);
+  
+  renderChart('top-buys-chart', buys, 'buy');
+  renderChart('top-sells-chart', sells, 'sell');
+}
+
+function renderChart(containerId, trades, type) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  
+  if (trades.length === 0) {
+    container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No data available</p>';
     return;
   }
   
-  let totalBuyVolume = 0;
-  let totalSellVolume = 0;
+  const maxValue = Math.max(...trades.map(t => calculateTransactionValue(t.share, t.transactionPrice)));
   
-  trades.forEach(trade => {
+  container.innerHTML = trades.map(trade => {
     const value = calculateTransactionValue(trade.share, trade.transactionPrice);
-    if (trade.transactionCode === 'P') {
-      totalBuyVolume += value;
-    } else if (trade.transactionCode === 'S') {
-      totalSellVolume += value;
-    }
-  });
-  
-  elements.statTotal.textContent = trades.length.toLocaleString();
-  elements.statBuyVolume.textContent = formatCurrencyShort(totalBuyVolume);
-  elements.statSellVolume.textContent = formatCurrencyShort(totalSellVolume);
-  
-  showStats();
-}
-
-function showStats() {
-  if (elements.statsBar) {
-    elements.statsBar.style.display = 'flex';
-  }
-}
-
-function hideStats() {
-  if (elements.statsBar) {
-    elements.statsBar.style.display = 'none';
-  }
+    const percentage = (value / maxValue) * 100;
+    
+    return `
+      <div class="chart-bar">
+        <div class="chart-bar-label">${trade.symbol}</div>
+        <div class="chart-bar-track">
+          <div class="chart-bar-fill ${type}" style="width: ${percentage}%">
+            ${formatCurrencyShort(value)}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 // ============================================================================
 // TABLE RENDERING
 // ============================================================================
 
-function createTableRow(trade) {
-  const row = document.createElement('tr');
-  const isBuy = trade.transactionCode === 'P';
-  
-  row.className = isBuy ? 'buy-row' : 'sell-row';
-  
-  const transactionValue = calculateTransactionValue(trade.share, trade.transactionPrice);
-  const ownedAfter = calculateOwnedAfter(trade.share, trade.change);
-  const changeValue = trade.change;
-  const changeClass = changeValue >= 0 ? 'positive' : 'negative';
-  
-  // Create table cells
-  const cells = [
-    { content: formatDate(trade.filingDate), class: '' },
-    { content: formatDate(trade.transactionDate), class: '' },
-    { content: trade.symbol, class: 'ticker' },
-    { content: trade.personName, class: 'person-name' },
-    { content: `<span class="trade-type ${isBuy ? 'buy' : 'sell'}">${isBuy ? 'BUY' : 'SELL'}</span>`, class: '', raw: true },
-    { content: formatCurrency(trade.transactionPrice), class: 'price' },
-    { content: formatNumber(Math.abs(trade.share)), class: 'shares' },
-    { content: formatCurrency(transactionValue), class: 'value' },
-    { content: ownedAfter !== null ? formatNumber(ownedAfter) : 'N/A', class: 'owned' },
-    { content: formatChangeValue(changeValue), class: `change-value ${changeClass}` }
-  ];
-  
-  cells.forEach(cell => {
-    const td = document.createElement('td');
-    if (cell.class) {
-      td.className = cell.class;
-    }
-    if (cell.raw) {
-      td.innerHTML = cell.content;
-    } else {
-      td.textContent = cell.content;
-    }
-    row.appendChild(td);
-  });
-  
-  return row;
-}
-
-function renderTable(trades) {
-  const tbody = elements.tableBody;
-  const table = elements.table;
+function renderTransactionsTable() {
+  const tbody = document.getElementById('data-table-body');
+  const table = tbody.closest('table');
   
   tbody.innerHTML = '';
   
-  if (!trades || trades.length === 0) {
+  if (state.allTrades.length === 0) {
     table.classList.remove('visible');
-    showEmptyState();
+    document.querySelector('.empty-state').classList.add('visible');
     return;
   }
   
-  const fragment = document.createDocumentFragment();
+  document.querySelector('.empty-state').classList.remove('visible');
   
-  trades.forEach(trade => {
+  const fragment = document.createDocumentFragment();
+  state.allTrades.forEach(trade => {
     fragment.appendChild(createTableRow(trade));
   });
   
   tbody.appendChild(fragment);
   table.classList.add('visible');
-  hideEmptyState();
 }
 
-// ============================================================================
-// SORTING FUNCTIONALITY
-// ============================================================================
-
-function sortTrades(column) {
-  if (state.currentSort.column === column) {
-    state.currentSort.direction = state.currentSort.direction === 'asc' ? 'desc' : 'asc';
-  } else {
-    state.currentSort.column = column;
-    state.currentSort.direction = 'desc';
+function createTableRow(trade) {
+  const row = document.createElement('tr');
+  const isBuy = trade.transactionCode === 'P';
+  row.className = isBuy ? 'buy-row' : 'sell-row';
+  
+  const value = calculateTransactionValue(trade.share, trade.transactionPrice);
+  const ownedAfter = calculateOwnedAfter(trade.share, trade.change, trade.transactionCode);
+  
+  // Calculate change percentage based on Finnhub's change field
+  let changePct = trade.change; // Finnhub provides this as percentage
+  let changePctDisplay = 'N/A';
+  let changePctClass = '';
+  
+  if (changePct !== null && changePct !== undefined && !isNaN(changePct)) {
+    const sign = changePct >= 0 ? '+' : '';
+    changePctDisplay = `${sign}${changePct.toFixed(2)}%`;
+    changePctClass = changePct >= 0 ? 'positive' : 'negative';
   }
   
-  const direction = state.currentSort.direction === 'asc' ? 1 : -1;
+  row.innerHTML = `
+    <td>${formatDate(trade.filingDate)}</td>
+    <td>${formatDate(trade.transactionDate)}</td>
+    <td class="ticker">${trade.symbol}</td>
+    <td>${trade.personName}</td>
+    <td><span class="trade-type ${isBuy ? 'buy' : 'sell'}">${isBuy ? 'BUY' : 'SELL'}</span></td>
+    <td class="price">${formatCurrency(trade.transactionPrice)}</td>
+    <td class="shares">${formatNumber(Math.abs(trade.share))}</td>
+    <td class="value">${formatCurrency(value)}</td>
+    <td class="owned">${ownedAfter !== null ? formatNumber(ownedAfter) : 'N/A'}</td>
+    <td class="change-pct ${changePctClass}">${changePctDisplay}</td>
+  `;
   
-  state.allTrades.sort((a, b) => {
-    let aVal, bVal;
-    
-    switch (column) {
-      case 'filingDate':
-        aVal = new Date(a.filingDate);
-        bVal = new Date(b.filingDate);
-        break;
-      case 'tradeDate':
-        aVal = new Date(a.transactionDate);
-        bVal = new Date(b.transactionDate);
-        break;
-      case 'ticker':
-        aVal = a.symbol.toLowerCase();
-        bVal = b.symbol.toLowerCase();
-        return direction * aVal.localeCompare(bVal);
-      case 'name':
-        aVal = a.personName.toLowerCase();
-        bVal = b.personName.toLowerCase();
-        return direction * aVal.localeCompare(bVal);
-      case 'type':
-        aVal = a.transactionCode;
-        bVal = b.transactionCode;
-        return direction * aVal.localeCompare(bVal);
-      case 'price':
-        aVal = a.transactionPrice || 0;
-        bVal = b.transactionPrice || 0;
-        break;
-      case 'qty':
-        aVal = Math.abs(a.share) || 0;
-        bVal = Math.abs(b.share) || 0;
-        break;
-      case 'value':
-        aVal = calculateTransactionValue(a.share, a.transactionPrice);
-        bVal = calculateTransactionValue(b.share, b.transactionPrice);
-        break;
-      case 'owned':
-        aVal = calculateOwnedAfter(a.share, a.change) || 0;
-        bVal = calculateOwnedAfter(b.share, b.change) || 0;
-        break;
-      case 'change':
-        aVal = a.change || 0;
-        bVal = b.change || 0;
-        break;
-      default:
-        return 0;
-    }
-    
-    if (aVal < bVal) return -direction;
-    if (aVal > bVal) return direction;
-    return 0;
-  });
-  
-  updateSortIndicators();
-  renderTable(state.allTrades);
+  return row;
 }
 
-function updateSortIndicators() {
-  elements.tableHeaders.forEach(header => {
-    const column = header.getAttribute('data-sort');
-    header.classList.remove('sorted-asc', 'sorted-desc');
-    
-    if (column === state.currentSort.column) {
-      header.classList.add(`sorted-${state.currentSort.direction}`);
-    }
-  });
-}
-
-// ============================================================================
-// DATE FILTERING
-// ============================================================================
-
-const applyDateFilters = debounce(() => {
-  state.filters.dateFrom = elements.filterDateFrom.value;
-  state.filters.dateTo = elements.filterDateTo.value;
+function renderEarningsTable(earnings) {
+  const tbody = document.getElementById('earnings-table-body');
+  const table = document.getElementById('earnings-table');
   
-  if (state.filters.dateFrom && state.filters.dateTo) {
-    const fromDate = new Date(state.filters.dateFrom);
-    const toDate = new Date(state.filters.dateTo);
-    
-    if (toDate < fromDate) {
-      showError('End date must be after start date');
-      return;
-    }
+  tbody.innerHTML = '';
+  
+  if (!earnings || earnings.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-secondary);">No earnings data available</td></tr>';
+    table.classList.add('visible');
+    return;
   }
   
-  loadData();
-}, CONFIG.DEBOUNCE_DELAY);
-
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
+  earnings.forEach(earning => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>${formatDate(earning.date)}</td>
+      <td class="ticker">${earning.symbol}</td>
+      <td>${earning.name || earning.symbol}</td>
+      <td>${earning.epsEstimate || 'N/A'}</td>
+      <td>${earning.epsActual || 'N/A'}</td>
+      <td>${earning.revenueEstimate ? formatCurrencyShort(earning.revenueEstimate) : 'N/A'}</td>
+      <td>${earning.revenueActual ? formatCurrencyShort(earning.revenueActual) : 'N/A'}</td>
+    `;
+    tbody.appendChild(row);
+  });
+  
+  table.classList.add('visible');
 }
 
 // ============================================================================
-// UI STATE MANAGEMENT
+// STATS
+// ============================================================================
+
+function updateStats() {
+  const statsBar = document.getElementById('stats-bar');
+  if (state.allTrades.length === 0) {
+    statsBar.style.display = 'none';
+    return;
+  }
+  
+  let buyVolume = 0, sellVolume = 0;
+  
+  state.allTrades.forEach(trade => {
+    const value = calculateTransactionValue(trade.share, trade.transactionPrice);
+    if (trade.transactionCode === 'P') buyVolume += value;
+    else if (trade.transactionCode === 'S') sellVolume += value;
+  });
+  
+  document.getElementById('stat-total').textContent = formatNumber(state.allTrades.length);
+  document.getElementById('stat-buy-volume').textContent = formatCurrencyShort(buyVolume);
+  document.getElementById('stat-sell-volume').textContent = formatCurrencyShort(sellVolume);
+  
+  statsBar.style.display = 'flex';
+}
+
+// ============================================================================
+// UI HELPERS
 // ============================================================================
 
 function showLoading() {
-  elements.loading.style.display = 'flex';
-  elements.table.classList.remove('visible');
-  elements.refreshBtn.classList.add('loading');
-  elements.refreshBtn.disabled = true;
+  document.getElementById('loading').style.display = 'flex';
 }
 
 function hideLoading() {
-  elements.loading.style.display = 'none';
-  elements.refreshBtn.classList.remove('loading');
-  elements.refreshBtn.disabled = false;
+  document.getElementById('loading').style.display = 'none';
 }
 
 function showError(message) {
-  elements.errorMessage.classList.add('visible');
-  const errorContent = elements.errorMessage.querySelector('.error-content p');
-  if (errorContent) {
-    errorContent.textContent = message;
-  }
-  elements.table.classList.remove('visible');
-}
-
-function hideError() {
-  elements.errorMessage.classList.remove('visible');
-}
-
-function showEmptyState() {
-  elements.emptyState.classList.add('visible');
-}
-
-function hideEmptyState() {
-  elements.emptyState.classList.remove('visible');
-}
-
-function updateTimestamp(timestamp) {
-  if (!elements.lastUpdated) return;
-  
-  const date = timestamp ? new Date(timestamp) : new Date();
-  const formatted = date.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-  
-  elements.lastUpdated.textContent = `Updated: ${formatted}`;
-  elements.lastUpdated.classList.add('visible');
+  console.error(message);
 }
 
 // ============================================================================
 // EVENT HANDLERS
 // ============================================================================
 
-function handleRefresh() {
-  loadData();
-}
-
-function handleSort(event) {
-  const header = event.target.closest('th[data-sort]');
-  if (!header) return;
+function handleTabChange(tabName) {
+  state.currentTab = tabName;
   
-  const column = header.getAttribute('data-sort');
-  sortTrades(column);
+  // Update tab buttons
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tabName);
+  });
+  
+  // Update tab content
+  document.querySelectorAll('.tab-content').forEach(content => {
+    content.classList.toggle('active', content.id === `${tabName}-tab`);
+  });
+  
+  // Load data for the tab
+  if (tabName === 'earnings' && document.getElementById('earnings-table-body').children.length === 0) {
+    loadEarningsCalendar();
+  }
 }
 
-function handleKeyboard(event) {
-  if (event.key === 'r' && !event.ctrlKey && !event.metaKey && !event.altKey) {
-    const activeElement = document.activeElement;
-    if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
-      event.preventDefault();
-      handleRefresh();
-    }
-  }
+function handleDashboardFilterChange() {
+  applyDashboardFilters();
+  renderDashboardCharts();
+}
+
+function handleAmountClick(e) {
+  if (!e.target.classList.contains('amount-btn')) return;
+  
+  // Single select - remove active from all, add to clicked
+  document.querySelectorAll('.amount-btn').forEach(btn => btn.classList.remove('active'));
+  e.target.classList.add('active');
+  
+  state.dashboardFilters.amount = e.target.dataset.amount;
+  handleDashboardFilterChange();
+}
+
+function handleTypeClick(e) {
+  if (!e.target.classList.contains('type-btn')) return;
+  
+  // Single select - remove active from all, add to clicked
+  document.querySelectorAll('.type-btn').forEach(btn => btn.classList.remove('active'));
+  e.target.classList.add('active');
+  
+  state.dashboardFilters.type = e.target.dataset.type;
+  handleDashboardFilterChange();
 }
 
 // ============================================================================
 // INITIALIZATION
 // ============================================================================
 
-function initializeElements() {
-  elements.refreshBtn = document.querySelector('#refresh-btn');
-  elements.tableBody = document.querySelector('#data-table-body');
-  elements.table = document.querySelector('table');
-  elements.loading = document.querySelector('#loading');
-  elements.errorMessage = document.querySelector('#error-message');
-  elements.emptyState = document.querySelector('.empty-state');
-  elements.lastUpdated = document.querySelector('#last-updated');
-  elements.filterDateFrom = document.querySelector('.filter-date-from');
-  elements.filterDateTo = document.querySelector('.filter-date-to');
-  elements.tableHeaders = document.querySelectorAll('th.sortable');
-  elements.statsBar = document.querySelector('#stats-bar');
-  elements.statTotal = document.querySelector('#stat-total');
-  elements.statBuyVolume = document.querySelector('#stat-buy-volume');
-  elements.statSellVolume = document.querySelector('#stat-sell-volume');
-}
-
-function setDefaultDateRange() {
-  const today = new Date();
-  const thirtyDaysAgo = new Date(today);
-  thirtyDaysAgo.setDate(today.getDate() - 30);
-  
-  elements.filterDateTo.value = today.toISOString().split('T')[0];
-  elements.filterDateFrom.value = thirtyDaysAgo.toISOString().split('T')[0];
-  
-  state.filters.dateFrom = elements.filterDateFrom.value;
-  state.filters.dateTo = elements.filterDateTo.value;
-}
-
 function initializeEventListeners() {
-  if (elements.refreshBtn) {
-    elements.refreshBtn.addEventListener('click', handleRefresh);
-  }
-  
-  if (elements.filterDateFrom) {
-    elements.filterDateFrom.addEventListener('change', applyDateFilters);
-  }
-  if (elements.filterDateTo) {
-    elements.filterDateTo.addEventListener('change', applyDateFilters);
-  }
-  
-  elements.tableHeaders.forEach(header => {
-    header.addEventListener('click', handleSort);
+  // Tab switching
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleTabChange(btn.dataset.tab));
   });
   
-  document.addEventListener('keydown', handleKeyboard);
+  // Refresh button
+  document.getElementById('refresh-btn').addEventListener('click', () => {
+    if (state.currentTab === 'earnings') loadEarningsCalendar();
+    else loadInsiderTrades();
+  });
+  
+  // Dashboard filters
+  document.getElementById('dash-ticker').addEventListener('input', (e) => {
+    state.dashboardFilters.ticker = e.target.value;
+    handleDashboardFilterChange();
+  });
+  
+  document.getElementById('dash-insider').addEventListener('input', (e) => {
+    state.dashboardFilters.insider = e.target.value;
+    handleDashboardFilterChange();
+  });
+  
+  document.getElementById('dash-from').addEventListener('change', (e) => {
+    state.dashboardFilters.dateFrom = e.target.value;
+    loadInsiderTrades();
+  });
+  
+  document.getElementById('dash-to').addEventListener('change', (e) => {
+    state.dashboardFilters.dateTo = e.target.value;
+    loadInsiderTrades();
+  });
+  
+  document.querySelector('.amount-buttons').addEventListener('click', handleAmountClick);
+  document.querySelector('.trade-type-buttons').addEventListener('click', handleTypeClick);
+  
+  // Table sorting
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => sortTable(th.dataset.sort));
+  });
 }
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function sortTable(column) {
+  // Sorting logic here if needed
+  console.log('Sort by:', column);
+}
+
+function setDefaultDates() {
+  const today = new Date().toISOString().split('T')[0];
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  
+  const dashFrom = document.getElementById('dash-from');
+  const dashTo = document.getElementById('dash-to');
+  
+  if (dashFrom) dashFrom.value = twoDaysAgo;
+  if (dashTo) dashTo.value = today;
+  
+  state.dashboardFilters.dateFrom = twoDaysAgo;
+  state.dashboardFilters.dateTo = today;
 }
 
 async function init() {
-  initializeElements();
-  setDefaultDateRange();
+  setDefaultDates();
   initializeEventListeners();
-  
-  await loadData();
+  await loadInsiderTrades();
 }
 
 // ============================================================================
-// START APPLICATION
+// START
 // ============================================================================
 
 if (document.readyState === 'loading') {
