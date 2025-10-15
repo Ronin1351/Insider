@@ -1,6 +1,6 @@
 /**
  * Insider Trading Tracker Application
- * Fetches and displays ALL insider trading transactions for a given time period
+ * Comprehensive insider trading data display
  */
 
 // ============================================================================
@@ -10,7 +10,7 @@
 const state = {
   allTrades: [],
   currentSort: {
-    column: 'date',
+    column: 'filingDate',
     direction: 'desc'
   },
   filters: {
@@ -56,14 +56,8 @@ const CONFIG = {
 // API FUNCTIONS
 // ============================================================================
 
-/**
- * Fetch insider trading data from the API with retry logic
- * @param {number} retryCount - Current retry attempt
- * @returns {Promise<Object>} API response data
- */
 async function fetchInsiderTrades(retryCount = 0) {
   try {
-    // Build query parameters
     const params = new URLSearchParams();
     if (state.filters.dateFrom) params.append('from', state.filters.dateFrom);
     if (state.filters.dateTo) params.append('to', state.filters.dateTo);
@@ -92,9 +86,6 @@ async function fetchInsiderTrades(retryCount = 0) {
   }
 }
 
-/**
- * Load and display insider trading data
- */
 async function loadData() {
   if (state.isLoading) return;
   
@@ -133,11 +124,6 @@ async function loadData() {
 // DATA PROCESSING & FORMATTING
 // ============================================================================
 
-/**
- * Format number as currency
- * @param {number} amount - Amount to format
- * @returns {string} Formatted currency string
- */
 function formatCurrency(amount) {
   if (amount === null || amount === undefined || isNaN(amount)) {
     return '$0.00';
@@ -150,11 +136,6 @@ function formatCurrency(amount) {
   }).format(amount);
 }
 
-/**
- * Format large currency amounts with K, M, B suffixes
- * @param {number} amount - Amount to format
- * @returns {string} Formatted currency string
- */
 function formatCurrencyShort(amount) {
   if (amount === null || amount === undefined || isNaN(amount)) {
     return '$0';
@@ -171,11 +152,13 @@ function formatCurrencyShort(amount) {
   return formatCurrency(amount);
 }
 
-/**
- * Format date string
- * @param {string} dateString - ISO date string
- * @returns {string} Formatted date
- */
+function formatNumber(num) {
+  if (num === null || num === undefined || isNaN(num)) {
+    return '0';
+  }
+  return new Intl.NumberFormat('en-US').format(num);
+}
+
 function formatDate(dateString) {
   if (!dateString) return 'N/A';
   
@@ -191,35 +174,30 @@ function formatDate(dateString) {
   }
 }
 
-/**
- * Format percentage with sign and color
- * @param {number} change - Percentage change
- * @returns {string} Formatted percentage
- */
-function formatPercentage(change) {
+function formatChangeValue(change) {
   if (change === null || change === undefined || isNaN(change)) {
-    return '0.0%';
+    return '0';
   }
+  
+  // Format as absolute number with sign
   const sign = change >= 0 ? '+' : '';
-  return `${sign}${change.toFixed(1)}%`;
+  return sign + formatNumber(Math.round(change));
 }
 
-/**
- * Calculate transaction value
- * @param {number} shares - Number of shares
- * @param {number} price - Price per share
- * @returns {number} Total transaction value
- */
 function calculateTransactionValue(shares, price) {
   if (!shares || !price) return 0;
-  return shares * price;
+  return Math.abs(shares) * price;
 }
 
-/**
- * Get user-friendly error message
- * @param {Error} error - Error object
- * @returns {string} User-friendly error message
- */
+function calculateOwnedAfter(shares, change) {
+  // If change represents the ownership after transaction
+  // Some APIs return this directly, others require calculation
+  if (change === null || change === undefined) return null;
+  
+  // Return the absolute value as shares owned
+  return Math.abs(change);
+}
+
 function getErrorMessage(error) {
   if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
     return 'Unable to connect. Please check your connection.';
@@ -237,10 +215,6 @@ function getErrorMessage(error) {
 // STATISTICS CALCULATION
 // ============================================================================
 
-/**
- * Update statistics display
- * @param {Array} trades - Array of trade objects
- */
 function updateStatistics(trades) {
   if (!trades || trades.length === 0) {
     hideStats();
@@ -282,11 +256,6 @@ function hideStats() {
 // TABLE RENDERING
 // ============================================================================
 
-/**
- * Create a single table row for a trade
- * @param {Object} trade - Trade data object
- * @returns {HTMLTableRowElement} Table row element
- */
 function createTableRow(trade) {
   const row = document.createElement('tr');
   const isBuy = trade.transactionCode === 'P';
@@ -294,40 +263,44 @@ function createTableRow(trade) {
   row.className = isBuy ? 'buy-row' : 'sell-row';
   
   const transactionValue = calculateTransactionValue(trade.share, trade.transactionPrice);
-  const changeFormatted = formatPercentage(trade.change);
-  const changeClass = trade.change >= 0 ? 'positive' : 'negative';
+  const ownedAfter = calculateOwnedAfter(trade.share, trade.change);
+  const changeValue = trade.change;
+  const changeClass = changeValue >= 0 ? 'positive' : 'negative';
   
-  // Create cells with data-label for mobile responsiveness
+  // Create table cells
   const cells = [
-    { label: 'Date', content: formatDate(trade.filingDate) },
-    { label: 'Ticker', content: trade.symbol, class: 'ticker' },
-    { label: 'Stock Price', content: formatCurrency(trade.transactionPrice), class: 'price' },
-    { label: 'Transaction Amount', content: formatCurrency(transactionValue), class: 'amount' },
-    { label: 'Own Δ%', content: changeFormatted, class: `delta ${changeClass}` }
+    { content: formatDate(trade.filingDate), class: '' },
+    { content: formatDate(trade.transactionDate), class: '' },
+    { content: trade.symbol, class: 'ticker' },
+    { content: trade.personName, class: 'person-name' },
+    { content: `<span class="trade-type ${isBuy ? 'buy' : 'sell'}">${isBuy ? 'BUY' : 'SELL'}</span>`, class: '', raw: true },
+    { content: formatCurrency(trade.transactionPrice), class: 'price' },
+    { content: formatNumber(Math.abs(trade.share)), class: 'shares' },
+    { content: formatCurrency(transactionValue), class: 'value' },
+    { content: ownedAfter !== null ? formatNumber(ownedAfter) : 'N/A', class: 'owned' },
+    { content: formatChangeValue(changeValue), class: `change-value ${changeClass}` }
   ];
   
   cells.forEach(cell => {
     const td = document.createElement('td');
-    td.setAttribute('data-label', cell.label);
     if (cell.class) {
       td.className = cell.class;
     }
-    td.textContent = cell.content;
+    if (cell.raw) {
+      td.innerHTML = cell.content;
+    } else {
+      td.textContent = cell.content;
+    }
     row.appendChild(td);
   });
   
   return row;
 }
 
-/**
- * Render the trades table
- * @param {Array} trades - Array of trade objects
- */
 function renderTable(trades) {
   const tbody = elements.tableBody;
   const table = elements.table;
   
-  // Clear existing rows
   tbody.innerHTML = '';
   
   if (!trades || trades.length === 0) {
@@ -336,7 +309,6 @@ function renderTable(trades) {
     return;
   }
   
-  // Use document fragment for better performance
   const fragment = document.createDocumentFragment();
   
   trades.forEach(trade => {
@@ -352,12 +324,7 @@ function renderTable(trades) {
 // SORTING FUNCTIONALITY
 // ============================================================================
 
-/**
- * Sort trades by column
- * @param {string} column - Column name to sort by
- */
 function sortTrades(column) {
-  // Toggle direction if same column, otherwise default to descending
   if (state.currentSort.column === column) {
     state.currentSort.direction = state.currentSort.direction === 'asc' ? 'desc' : 'asc';
   } else {
@@ -371,23 +338,43 @@ function sortTrades(column) {
     let aVal, bVal;
     
     switch (column) {
-      case 'date':
+      case 'filingDate':
         aVal = new Date(a.filingDate);
         bVal = new Date(b.filingDate);
+        break;
+      case 'tradeDate':
+        aVal = new Date(a.transactionDate);
+        bVal = new Date(b.transactionDate);
         break;
       case 'ticker':
         aVal = a.symbol.toLowerCase();
         bVal = b.symbol.toLowerCase();
         return direction * aVal.localeCompare(bVal);
+      case 'name':
+        aVal = a.personName.toLowerCase();
+        bVal = b.personName.toLowerCase();
+        return direction * aVal.localeCompare(bVal);
+      case 'type':
+        aVal = a.transactionCode;
+        bVal = b.transactionCode;
+        return direction * aVal.localeCompare(bVal);
       case 'price':
         aVal = a.transactionPrice || 0;
         bVal = b.transactionPrice || 0;
         break;
-      case 'amount':
+      case 'qty':
+        aVal = Math.abs(a.share) || 0;
+        bVal = Math.abs(b.share) || 0;
+        break;
+      case 'value':
         aVal = calculateTransactionValue(a.share, a.transactionPrice);
         bVal = calculateTransactionValue(b.share, b.transactionPrice);
         break;
-      case 'delta':
+      case 'owned':
+        aVal = calculateOwnedAfter(a.share, a.change) || 0;
+        bVal = calculateOwnedAfter(b.share, b.change) || 0;
+        break;
+      case 'change':
         aVal = a.change || 0;
         bVal = b.change || 0;
         break;
@@ -404,9 +391,6 @@ function sortTrades(column) {
   renderTable(state.allTrades);
 }
 
-/**
- * Update visual sort indicators on table headers
- */
 function updateSortIndicators() {
   elements.tableHeaders.forEach(header => {
     const column = header.getAttribute('data-sort');
@@ -422,14 +406,10 @@ function updateSortIndicators() {
 // DATE FILTERING
 // ============================================================================
 
-/**
- * Apply date filters and reload data
- */
 const applyDateFilters = debounce(() => {
   state.filters.dateFrom = elements.filterDateFrom.value;
   state.filters.dateTo = elements.filterDateTo.value;
   
-  // Validate date range
   if (state.filters.dateFrom && state.filters.dateTo) {
     const fromDate = new Date(state.filters.dateFrom);
     const toDate = new Date(state.filters.dateTo);
@@ -443,12 +423,6 @@ const applyDateFilters = debounce(() => {
   loadData();
 }, CONFIG.DEBOUNCE_DELAY);
 
-/**
- * Debounce function to limit rapid calls
- * @param {Function} func - Function to debounce
- * @param {number} wait - Wait time in milliseconds
- * @returns {Function} Debounced function
- */
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -465,9 +439,6 @@ function debounce(func, wait) {
 // UI STATE MANAGEMENT
 // ============================================================================
 
-/**
- * Show loading state
- */
 function showLoading() {
   elements.loading.style.display = 'flex';
   elements.table.classList.remove('visible');
@@ -475,19 +446,12 @@ function showLoading() {
   elements.refreshBtn.disabled = true;
 }
 
-/**
- * Hide loading state
- */
 function hideLoading() {
   elements.loading.style.display = 'none';
   elements.refreshBtn.classList.remove('loading');
   elements.refreshBtn.disabled = false;
 }
 
-/**
- * Show error message
- * @param {string} message - Error message to display
- */
 function showError(message) {
   elements.errorMessage.classList.add('visible');
   const errorContent = elements.errorMessage.querySelector('.error-content p');
@@ -497,31 +461,18 @@ function showError(message) {
   elements.table.classList.remove('visible');
 }
 
-/**
- * Hide error message
- */
 function hideError() {
   elements.errorMessage.classList.remove('visible');
 }
 
-/**
- * Show empty state
- */
 function showEmptyState() {
   elements.emptyState.classList.add('visible');
 }
 
-/**
- * Hide empty state
- */
 function hideEmptyState() {
   elements.emptyState.classList.remove('visible');
 }
 
-/**
- * Update last updated timestamp
- * @param {string} timestamp - ISO timestamp string
- */
 function updateTimestamp(timestamp) {
   if (!elements.lastUpdated) return;
   
@@ -541,17 +492,10 @@ function updateTimestamp(timestamp) {
 // EVENT HANDLERS
 // ============================================================================
 
-/**
- * Handle refresh button click
- */
 function handleRefresh() {
   loadData();
 }
 
-/**
- * Handle table header click for sorting
- * @param {Event} event - Click event
- */
 function handleSort(event) {
   const header = event.target.closest('th[data-sort]');
   if (!header) return;
@@ -560,15 +504,9 @@ function handleSort(event) {
   sortTrades(column);
 }
 
-/**
- * Handle keyboard shortcuts
- * @param {KeyboardEvent} event - Keyboard event
- */
 function handleKeyboard(event) {
-  // R key for refresh (without modifiers)
   if (event.key === 'r' && !event.ctrlKey && !event.metaKey && !event.altKey) {
     const activeElement = document.activeElement;
-    // Don't trigger if user is typing in an input
     if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
       event.preventDefault();
       handleRefresh();
@@ -580,9 +518,6 @@ function handleKeyboard(event) {
 // INITIALIZATION
 // ============================================================================
 
-/**
- * Initialize DOM element references
- */
 function initializeElements() {
   elements.refreshBtn = document.querySelector('#refresh-btn');
   elements.tableBody = document.querySelector('#data-table-body');
@@ -600,9 +535,6 @@ function initializeElements() {
   elements.statSellVolume = document.querySelector('#stat-sell-volume');
 }
 
-/**
- * Set default date range (last 30 days)
- */
 function setDefaultDateRange() {
   const today = new Date();
   const thirtyDaysAgo = new Date(today);
@@ -615,16 +547,11 @@ function setDefaultDateRange() {
   state.filters.dateTo = elements.filterDateTo.value;
 }
 
-/**
- * Initialize event listeners
- */
 function initializeEventListeners() {
-  // Refresh button
   if (elements.refreshBtn) {
     elements.refreshBtn.addEventListener('click', handleRefresh);
   }
   
-  // Date filter inputs
   if (elements.filterDateFrom) {
     elements.filterDateFrom.addEventListener('change', applyDateFilters);
   }
@@ -632,33 +559,22 @@ function initializeEventListeners() {
     elements.filterDateTo.addEventListener('change', applyDateFilters);
   }
   
-  // Table header sorting
   elements.tableHeaders.forEach(header => {
     header.addEventListener('click', handleSort);
   });
   
-  // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboard);
 }
 
-/**
- * Utility delay function
- * @param {number} ms - Milliseconds to delay
- * @returns {Promise} Promise that resolves after delay
- */
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/**
- * Main initialization function
- */
 async function init() {
   initializeElements();
   setDefaultDateRange();
   initializeEventListeners();
   
-  // Load initial data
   await loadData();
 }
 
@@ -666,7 +582,6 @@ async function init() {
 // START APPLICATION
 // ============================================================================
 
-// Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
