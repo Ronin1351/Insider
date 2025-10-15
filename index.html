@@ -6,20 +6,14 @@
     <meta name="description" content="Track all insider trading transactions across the market. Real-time updates from Finnhub API.">
     <meta name="keywords" content="insider trading, stock market, financial data, Finnhub">
     
-    <!-- Open Graph Meta Tags -->
     <meta property="og:title" content="Insider Trading Tracker">
     <meta property="og:description" content="Track all insider trading transactions across the market">
     <meta property="og:type" content="website">
     
     <title>Insider Trading Tracker | All Market Transactions</title>
     
-    <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📊</text></svg>">
     
-    <!-- Optional: External CSS placeholder -->
-    <!-- <link rel="stylesheet" href="styles.css"> -->
-    
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -56,13 +50,12 @@
         }
         
         .container {
-            max-width: 1400px;
+            max-width: 1600px;
             margin: 0 auto;
             padding: 0 1rem;
             width: 100%;
         }
         
-        /* Header */
         header {
             background: var(--bg-secondary);
             padding: 2rem 0;
@@ -130,22 +123,16 @@
             box-shadow: 0 4px 12px var(--shadow);
         }
         
-        #refresh-btn:active {
-            transform: translateY(0);
-        }
-        
         #refresh-btn.loading {
             opacity: 0.6;
             cursor: not-allowed;
         }
         
-        /* Main Content */
         main {
             flex: 1;
             padding: 2rem 0;
         }
         
-        /* Filters Section */
         .filters-section {
             background: var(--bg-secondary);
             padding: 1.5rem;
@@ -194,7 +181,6 @@
             border-color: var(--accent);
         }
         
-        /* Stats Bar */
         .stats-bar {
             background: var(--bg-secondary);
             padding: 1rem 1.5rem;
@@ -226,7 +212,6 @@
             color: var(--text-primary);
         }
         
-        /* Table Section */
         .table-section {
             background: var(--bg-secondary);
             border-radius: 12px;
@@ -234,7 +219,6 @@
             box-shadow: 0 4px 6px var(--shadow);
         }
         
-        /* Loading State */
         #loading {
             display: flex;
             flex-direction: column;
@@ -262,7 +246,6 @@
             font-size: 1rem;
         }
         
-        /* Error State */
         #error-message {
             display: none;
             padding: 2rem;
@@ -291,7 +274,6 @@
             color: var(--text-secondary);
         }
         
-        /* Table */
         .table-wrapper {
             overflow-x: auto;
         }
@@ -300,6 +282,7 @@
             width: 100%;
             border-collapse: collapse;
             display: none;
+            min-width: 1200px;
         }
         
         table.visible {
@@ -319,10 +302,10 @@
         }
         
         th {
-            padding: 1rem;
+            padding: 1rem 0.75rem;
             text-align: left;
             font-weight: 600;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: var(--text-secondary);
@@ -376,34 +359,58 @@
         }
         
         td {
-            padding: 1rem;
-            font-size: 0.95rem;
+            padding: 0.875rem 0.75rem;
+            font-size: 0.9rem;
         }
         
         .ticker {
             font-weight: 600;
             color: var(--accent);
-            font-size: 1.05rem;
+            font-size: 1rem;
         }
         
-        .price,
-        .amount {
-            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+        .person-name {
+            font-weight: 500;
+            color: var(--text-primary);
         }
         
-        .delta {
-            font-weight: 600;
+        .trade-type {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
         }
         
-        .delta.positive {
+        .trade-type.buy {
+            background: rgba(16, 185, 129, 0.2);
             color: var(--buy-color);
         }
         
-        .delta.negative {
+        .trade-type.sell {
+            background: rgba(239, 68, 68, 0.2);
             color: var(--sell-color);
         }
         
-        /* Empty State */
+        .price, .shares, .value, .owned {
+            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
+            color: var(--text-primary);
+        }
+        
+        .change-value {
+            font-weight: 600;
+            font-family: 'SF Mono', monospace;
+        }
+        
+        .change-value.positive {
+            color: var(--buy-color);
+        }
+        
+        .change-value.negative {
+            color: var(--sell-color);
+        }
+        
         .empty-state {
             display: none;
             padding: 4rem 2rem;
@@ -429,7 +436,6 @@
             color: var(--text-secondary);
         }
         
-        /* Footer */
         footer {
             background: var(--bg-secondary);
             padding: 2rem 0;
@@ -455,7 +461,6 @@
             text-decoration: underline;
         }
         
-        /* Mobile Responsive */
         @media (max-width: 768px) {
             .header-text h1 {
                 font-size: 1.5rem;
@@ -480,70 +485,17 @@
                 align-items: flex-start;
             }
             
-            /* Mobile Card View */
             .table-wrapper {
-                overflow-x: visible;
+                overflow-x: auto;
             }
             
-            table,
-            thead,
-            tbody,
-            th,
-            td,
-            tr {
-                display: block;
-            }
-            
-            thead {
-                display: none;
-            }
-            
-            tbody tr {
-                margin-bottom: 1rem;
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                overflow: hidden;
-            }
-            
-            td {
-                padding: 0.75rem 1rem;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-            }
-            
-            td::before {
-                content: attr(data-label);
-                font-weight: 600;
-                color: var(--text-secondary);
-                font-size: 0.875rem;
-                text-transform: uppercase;
-            }
-            
-            td:first-child {
-                background: var(--bg-card);
-                font-weight: 600;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .container {
-                padding: 0 0.75rem;
-            }
-            
-            header {
-                padding: 1.5rem 0;
-            }
-            
-            #refresh-btn {
-                padding: 0.625rem 1rem;
-                font-size: 0.875rem;
+            table {
+                min-width: 1200px;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Header -->
     <header>
         <div class="container">
             <div class="header-content">
@@ -562,10 +514,8 @@
         </div>
     </header>
 
-    <!-- Main Content -->
     <main>
         <div class="container">
-            <!-- Filters Section -->
             <section class="filters-section">
                 <h2 class="filters-title">Date Range</h2>
                 <div class="filters-grid">
@@ -590,7 +540,6 @@
                 </div>
             </section>
 
-            <!-- Stats Bar -->
             <section class="stats-bar" id="stats-bar" style="display: none;">
                 <div class="stat-item">
                     <span class="stat-label">Total Transactions</span>
@@ -606,15 +555,12 @@
                 </div>
             </section>
 
-            <!-- Table Section -->
             <section class="table-section">
-                <!-- Loading State -->
                 <div id="loading">
                     <div class="spinner" role="status" aria-label="Loading data"></div>
                     <p>Loading all insider trading transactions...</p>
                 </div>
 
-                <!-- Error State -->
                 <div id="error-message">
                     <div class="error-content">
                         <h3>⚠️ Error Loading Data</h3>
@@ -622,27 +568,29 @@
                     </div>
                 </div>
 
-                <!-- Empty State -->
                 <div class="empty-state">
                     <div class="empty-state-icon">📭</div>
                     <h3>No Data Available</h3>
                     <p>No insider trading transactions found for the selected date range.</p>
                 </div>
 
-                <!-- Data Table -->
                 <div class="table-wrapper">
                     <table role="table" aria-label="Insider trading data">
                         <thead>
                             <tr>
-                                <th class="sortable" data-sort="date" role="columnheader">Date</th>
+                                <th class="sortable" data-sort="filingDate" role="columnheader">Filing Date</th>
+                                <th class="sortable" data-sort="tradeDate" role="columnheader">Trade Date</th>
                                 <th class="sortable" data-sort="ticker" role="columnheader">Ticker</th>
-                                <th class="sortable" data-sort="price" role="columnheader">Stock Price</th>
-                                <th class="sortable" data-sort="amount" role="columnheader">Transaction Amount</th>
-                                <th class="sortable" data-sort="delta" role="columnheader">Own Δ%</th>
+                                <th class="sortable" data-sort="name" role="columnheader">Insider Name</th>
+                                <th class="sortable" data-sort="type" role="columnheader">Type</th>
+                                <th class="sortable" data-sort="price" role="columnheader">Price</th>
+                                <th class="sortable" data-sort="qty" role="columnheader">Qty</th>
+                                <th class="sortable" data-sort="value" role="columnheader">Value</th>
+                                <th class="sortable" data-sort="owned" role="columnheader">Owned After</th>
+                                <th class="sortable" data-sort="change" role="columnheader">Change</th>
                             </tr>
                         </thead>
                         <tbody id="data-table-body">
-                            <!-- Data will be inserted here by JavaScript -->
                         </tbody>
                     </table>
                 </div>
@@ -650,7 +598,6 @@
         </div>
     </main>
 
-    <!-- Footer -->
     <footer>
         <div class="container">
             <div class="footer-content">
@@ -662,7 +609,6 @@
         </div>
     </footer>
 
-    <!-- External JavaScript -->
     <script src="app.js"></script>
 </body>
 </html>
