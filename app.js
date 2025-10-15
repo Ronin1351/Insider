@@ -166,13 +166,21 @@ async function loadInsiderTrades() {
     state.isLoading = true;
     showLoading();
     
+    console.log('Loading insider trades...');
     const response = await fetchInsiderTrades();
+    console.log('API Response:', response);
+    
     state.allTrades = response.data || [];
+    console.log('Loaded trades:', state.allTrades.length);
     
     applyDashboardFilters();
     renderDashboardCharts();
     renderTransactionsTable();
     updateStats();
+    
+    if (state.allTrades.length === 0) {
+      console.warn('No trades returned from API');
+    }
     
   } catch (error) {
     console.error('Error loading trades:', error);
@@ -204,20 +212,20 @@ async function loadEarningsCalendar() {
 function applyDashboardFilters() {
   let filtered = [...state.allTrades];
   
-  // Ticker filter
-  if (state.dashboardFilters.ticker) {
-    const search = state.dashboardFilters.ticker.toLowerCase();
-    filtered = filtered.filter(t => t.symbol.toLowerCase().includes(search));
+  // Ticker filter - ONLY apply if user typed something
+  if (state.dashboardFilters.ticker && state.dashboardFilters.ticker.trim() !== '') {
+    const search = state.dashboardFilters.ticker.toLowerCase().trim();
+    filtered = filtered.filter(t => t.symbol && t.symbol.toLowerCase().includes(search));
   }
   
-  // Insider filter
-  if (state.dashboardFilters.insider) {
-    const search = state.dashboardFilters.insider.toLowerCase();
-    filtered = filtered.filter(t => t.personName.toLowerCase().includes(search));
+  // Insider filter - ONLY apply if user typed something
+  if (state.dashboardFilters.insider && state.dashboardFilters.insider.trim() !== '') {
+    const search = state.dashboardFilters.insider.toLowerCase().trim();
+    filtered = filtered.filter(t => t.personName && t.personName.toLowerCase().includes(search));
   }
   
-  // Amount filter
-  if (state.dashboardFilters.amount !== 'all') {
+  // Amount filter - ONLY apply if NOT "all"
+  if (state.dashboardFilters.amount && state.dashboardFilters.amount !== 'all') {
     filtered = filtered.filter(t => {
       const value = calculateTransactionValue(t.share, t.transactionPrice);
       switch (state.dashboardFilters.amount) {
@@ -229,8 +237,8 @@ function applyDashboardFilters() {
     });
   }
   
-  // Type filter (single select)
-  if (state.dashboardFilters.type !== 'all') {
+  // Type filter - ONLY apply if NOT "all"
+  if (state.dashboardFilters.type && state.dashboardFilters.type !== 'all') {
     filtered = filtered.filter(t => {
       const isBuy = t.transactionCode === 'P';
       if (state.dashboardFilters.type === 'buy') return isBuy;
@@ -240,6 +248,13 @@ function applyDashboardFilters() {
   }
   
   state.filteredTrades = filtered;
+  
+  // Debug logging
+  console.log('Filter applied:', {
+    totalTrades: state.allTrades.length,
+    filteredTrades: filtered.length,
+    filters: state.dashboardFilters
+  });
 }
 
 // ============================================================================
@@ -247,6 +262,8 @@ function applyDashboardFilters() {
 // ============================================================================
 
 function renderDashboardCharts() {
+  console.log('Rendering dashboard charts with', state.filteredTrades.length, 'filtered trades');
+  
   const buys = state.filteredTrades
     .filter(t => t.transactionCode === 'P')
     .sort((a, b) => calculateTransactionValue(b.share, b.transactionPrice) - 
@@ -258,6 +275,8 @@ function renderDashboardCharts() {
     .sort((a, b) => calculateTransactionValue(b.share, b.transactionPrice) - 
                     calculateTransactionValue(a.share, a.transactionPrice))
     .slice(0, 10);
+  
+  console.log('Top buys:', buys.length, 'Top sells:', sells.length);
   
   renderChart('top-buys-chart', buys, 'buy');
   renderChart('top-sells-chart', sells, 'sell');
@@ -491,28 +510,50 @@ function initializeEventListeners() {
   });
   
   // Dashboard filters
-  document.getElementById('dash-ticker').addEventListener('input', (e) => {
-    state.dashboardFilters.ticker = e.target.value;
-    handleDashboardFilterChange();
-  });
+  const tickerInput = document.getElementById('dash-ticker');
+  const insiderInput = document.getElementById('dash-insider');
   
-  document.getElementById('dash-insider').addEventListener('input', (e) => {
-    state.dashboardFilters.insider = e.target.value;
-    handleDashboardFilterChange();
-  });
+  if (tickerInput) {
+    tickerInput.addEventListener('input', (e) => {
+      state.dashboardFilters.ticker = e.target.value.trim();
+      handleDashboardFilterChange();
+    });
+  }
   
-  document.getElementById('dash-from').addEventListener('change', (e) => {
-    state.dashboardFilters.dateFrom = e.target.value;
-    loadInsiderTrades();
-  });
+  if (insiderInput) {
+    insiderInput.addEventListener('input', (e) => {
+      state.dashboardFilters.insider = e.target.value.trim();
+      handleDashboardFilterChange();
+    });
+  }
   
-  document.getElementById('dash-to').addEventListener('change', (e) => {
-    state.dashboardFilters.dateTo = e.target.value;
-    loadInsiderTrades();
-  });
+  const dashFrom = document.getElementById('dash-from');
+  const dashTo = document.getElementById('dash-to');
   
-  document.querySelector('.amount-buttons').addEventListener('click', handleAmountClick);
-  document.querySelector('.trade-type-buttons').addEventListener('click', handleTypeClick);
+  if (dashFrom) {
+    dashFrom.addEventListener('change', (e) => {
+      state.dashboardFilters.dateFrom = e.target.value;
+      loadInsiderTrades();
+    });
+  }
+  
+  if (dashTo) {
+    dashTo.addEventListener('change', (e) => {
+      state.dashboardFilters.dateTo = e.target.value;
+      loadInsiderTrades();
+    });
+  }
+  
+  const amountButtons = document.querySelector('.amount-buttons');
+  const typeButtons = document.querySelector('.trade-type-buttons');
+  
+  if (amountButtons) {
+    amountButtons.addEventListener('click', handleAmountClick);
+  }
+  
+  if (typeButtons) {
+    typeButtons.addEventListener('click', handleTypeClick);
+  }
   
   // Table sorting
   document.querySelectorAll('th.sortable').forEach(th => {
