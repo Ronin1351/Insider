@@ -3,17 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Track all insider trading transactions across the market. Real-time updates from Finnhub API.">
-    <meta name="keywords" content="insider trading, stock market, financial data, Finnhub">
-    
-    <meta property="og:title" content="Insider Trading Tracker">
-    <meta property="og:description" content="Track all insider trading transactions across the market">
-    <meta property="og:type" content="website">
-    
-    <title>Insider Trading Tracker | All Market Transactions</title>
+    <meta name="description" content="Track insider trading and earnings calendar. Real-time data from Finnhub API.">
+    <title>Insider Trading Tracker | Market Intelligence</title>
     
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='0.9em' font-size='90'>📊</text></svg>">
-    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -77,7 +70,6 @@
         .header-text h1 {
             font-size: 2rem;
             font-weight: 700;
-            color: var(--text-primary);
             margin-bottom: 0.25rem;
         }
         
@@ -120,7 +112,6 @@
         #refresh-btn:hover {
             background: var(--accent-hover);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px var(--shadow);
         }
         
         #refresh-btn.loading {
@@ -128,59 +119,262 @@
             cursor: not-allowed;
         }
         
-        main {
-            flex: 1;
-            padding: 2rem 0;
+        /* Tabs */
+        .tabs {
+            background: var(--bg-secondary);
+            padding: 0;
+            margin: 2rem 0 0 0;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            gap: 0;
+            overflow-x: auto;
         }
         
-        .filters-section {
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        
+        .tab-btn.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--accent);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        main {
+            flex: 1;
+            padding: 0 0 2rem 0;
+        }
+        
+        /* Dashboard Layout */
+        .dashboard-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+        
+        .dashboard-filters {
             background: var(--bg-secondary);
             padding: 1.5rem;
             border-radius: 12px;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px var(--shadow);
+            height: fit-content;
+            position: sticky;
+            top: 140px;
         }
         
-        .filters-title {
-            font-size: 1.25rem;
+        .filter-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .filter-group:last-child {
+            margin-bottom: 0;
+        }
+        
+        .filter-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .filter-group input,
+        .filter-group select {
+            width: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.75rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+        
+        .filter-group input:focus,
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        
+        .amount-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+        }
+        
+        .amount-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .amount-btn:hover {
+            background: var(--accent);
+            color: var(--text-primary);
+        }
+        
+        .amount-btn.active {
+            background: var(--accent);
+            color: var(--text-primary);
+            border-color: var(--accent);
+            font-weight: 600;
+        }
+        
+        .trade-type-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+        }
+        
+        .type-btn {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 0.75rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .type-btn:hover {
+            background: var(--accent);
+            color: var(--text-primary);
+        }
+        
+        .type-btn.active.all {
+            background: var(--accent);
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+        
+        .type-btn.active.buy {
+            background: var(--buy-color);
+            color: white;
+            border-color: var(--buy-color);
+        }
+        
+        .type-btn.active.sell {
+            background: var(--sell-color);
+            color: white;
+            border-color: var(--sell-color);
+        }
+        
+        /* Visualizations */
+        .viz-section {
+            background: var(--bg-secondary);
+            padding: 2rem;
+            border-radius: 12px;
+        }
+        
+        .viz-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .viz-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 2rem;
+        }
+        
+        .chart-container {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+        
+        .chart-title {
+            font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 1rem;
             color: var(--text-primary);
         }
         
-        .filters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
+        .chart-title.buy {
+            color: var(--buy-color);
         }
         
-        .filter-group {
+        .chart-title.sell {
+            color: var(--sell-color);
+        }
+        
+        .chart-bar {
             display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
         }
         
-        .filter-group label {
-            font-size: 0.875rem;
-            font-weight: 500;
-            color: var(--text-secondary);
+        .chart-bar-label {
+            min-width: 60px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent);
         }
         
-        .filter-group input {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.625rem;
-            border-radius: 6px;
-            font-size: 0.95rem;
-            transition: border-color 0.3s ease;
+        .chart-bar-track {
+            flex: 1;
+            background: var(--bg-primary);
+            height: 32px;
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
         }
         
-        .filter-group input:focus {
-            outline: none;
-            border-color: var(--accent);
+        .chart-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            padding: 0 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: width 0.5s ease;
         }
         
+        .chart-bar-fill.buy {
+            background: var(--buy-color);
+        }
+        
+        .chart-bar-fill.sell {
+            background: var(--sell-color);
+        }
+        
+        /* Stats */
         .stats-bar {
             background: var(--bg-secondary);
             padding: 1rem 1.5rem;
@@ -188,10 +382,8 @@
             margin-bottom: 2rem;
             display: flex;
             justify-content: space-between;
-            align-items: center;
             flex-wrap: wrap;
             gap: 1rem;
-            box-shadow: 0 4px 6px var(--shadow);
         }
         
         .stat-item {
@@ -209,17 +401,17 @@
         .stat-value {
             font-size: 1.5rem;
             font-weight: 700;
-            color: var(--text-primary);
         }
         
+        /* Table */
         .table-section {
             background: var(--bg-secondary);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 6px var(--shadow);
+            margin-top: 2rem;
         }
         
-        #loading {
+        #loading, #earnings-loading {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -241,39 +433,6 @@
             to { transform: rotate(360deg); }
         }
         
-        #loading p {
-            color: var(--text-secondary);
-            font-size: 1rem;
-        }
-        
-        #error-message {
-            display: none;
-            padding: 2rem;
-            text-align: center;
-        }
-        
-        #error-message.visible {
-            display: block;
-        }
-        
-        .error-content {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid var(--sell-color);
-            border-radius: 8px;
-            padding: 1.5rem;
-            max-width: 600px;
-            margin: 0 auto;
-        }
-        
-        .error-content h3 {
-            color: var(--sell-color);
-            margin-bottom: 0.5rem;
-        }
-        
-        .error-content p {
-            color: var(--text-secondary);
-        }
-        
         .table-wrapper {
             overflow-x: auto;
         }
@@ -282,7 +441,7 @@
             width: 100%;
             border-collapse: collapse;
             display: none;
-            min-width: 1200px;
+            min-width: 1400px;
         }
         
         table.visible {
@@ -291,14 +450,12 @@
         }
         
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         
         thead {
             background: var(--bg-card);
-            position: sticky;
-            top: 0;
         }
         
         th {
@@ -311,7 +468,6 @@
             color: var(--text-secondary);
             cursor: pointer;
             user-select: none;
-            transition: background 0.2s ease;
             white-space: nowrap;
         }
         
@@ -337,7 +493,6 @@
         
         tbody tr {
             border-bottom: 1px solid var(--border-color);
-            transition: background 0.2s ease;
         }
         
         tbody tr:nth-child(odd) {
@@ -350,12 +505,10 @@
         
         tbody tr.buy-row {
             border-left: 4px solid var(--buy-color);
-            background: rgba(16, 185, 129, 0.05);
         }
         
         tbody tr.sell-row {
             border-left: 4px solid var(--sell-color);
-            background: rgba(239, 68, 68, 0.05);
         }
         
         td {
@@ -369,18 +522,12 @@
             font-size: 1rem;
         }
         
-        .person-name {
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-        
         .trade-type {
             display: inline-block;
             padding: 0.25rem 0.75rem;
             border-radius: 4px;
             font-size: 0.8rem;
             font-weight: 700;
-            text-transform: uppercase;
         }
         
         .trade-type.buy {
@@ -394,20 +541,19 @@
         }
         
         .price, .shares, .value, .owned {
-            font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-            color: var(--text-primary);
+            font-family: 'SF Mono', monospace;
         }
         
-        .change-value {
+        .change-pct {
             font-weight: 600;
             font-family: 'SF Mono', monospace;
         }
         
-        .change-value.positive {
+        .change-pct.positive {
             color: var(--buy-color);
         }
         
-        .change-value.negative {
+        .change-pct.negative {
             color: var(--sell-color);
         }
         
@@ -419,21 +565,6 @@
         
         .empty-state.visible {
             display: block;
-        }
-        
-        .empty-state-icon {
-            font-size: 4rem;
-            margin-bottom: 1rem;
-            opacity: 0.3;
-        }
-        
-        .empty-state h3 {
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
-        }
-        
-        .empty-state p {
-            color: var(--text-secondary);
         }
         
         footer {
@@ -449,48 +580,31 @@
             font-size: 0.875rem;
         }
         
-        .footer-content a {
-            color: var(--accent);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
-        
-        .footer-content a:hover {
-            color: var(--accent-hover);
-            text-decoration: underline;
+        @media (max-width: 1200px) {
+            .dashboard-layout {
+                grid-template-columns: 250px 1fr;
+            }
+            
+            .viz-grid {
+                grid-template-columns: 1fr;
+            }
         }
         
         @media (max-width: 768px) {
-            .header-text h1 {
-                font-size: 1.5rem;
-            }
-            
-            .header-content {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .header-actions {
-                width: 100%;
-                justify-content: space-between;
-            }
-            
-            .filters-grid {
+            .dashboard-layout {
                 grid-template-columns: 1fr;
             }
             
-            .stats-bar {
-                flex-direction: column;
-                align-items: flex-start;
+            .dashboard-filters {
+                position: static;
             }
             
-            .table-wrapper {
-                overflow-x: auto;
+            .tabs {
+                overflow-x: scroll;
             }
             
             table {
-                min-width: 1200px;
+                min-width: 1400px;
             }
         }
     </style>
@@ -501,11 +615,11 @@
             <div class="header-content">
                 <div class="header-text">
                     <h1>📊 Insider Trading Tracker</h1>
-                    <p>All insider transactions across the market - Powered by Finnhub API</p>
+                    <p>Market intelligence powered by Finnhub API</p>
                 </div>
                 <div class="header-actions">
                     <span id="last-updated"></span>
-                    <button id="refresh-btn" aria-label="Refresh data">
+                    <button id="refresh-btn">
                         <span>↻</span>
                         <span>Refresh</span>
                     </button>
@@ -516,95 +630,158 @@
 
     <main>
         <div class="container">
-            <section class="filters-section">
-                <h2 class="filters-title">Date Range</h2>
-                <div class="filters-grid">
-                    <div class="filter-group">
-                        <label for="filter-date-from">From Date</label>
-                        <input 
-                            type="date" 
-                            id="filter-date-from" 
-                            class="filter-date-from"
-                            aria-label="Filter from date"
-                        >
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+                <button class="tab-btn" data-tab="transactions">All Transactions</button>
+                <button class="tab-btn" data-tab="earnings">Earnings Calendar</button>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div class="tab-content active" id="dashboard-tab">
+                <div class="dashboard-layout">
+                    <!-- Filters -->
+                    <aside class="dashboard-filters">
+                        <div class="filter-group">
+                            <label>Ticker</label>
+                            <input type="text" id="dash-ticker" placeholder="e.g., TSLA">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>Insider</label>
+                            <input type="text" id="dash-insider" placeholder="e.g., Musk">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>Amount</label>
+                            <div class="amount-buttons">
+                                <button class="amount-btn active" data-amount="all">ALL</button>
+                                <button class="amount-btn" data-amount="1-100k">$1-$100K</button>
+                                <button class="amount-btn" data-amount="100k-1m">$100K-$1M</button>
+                                <button class="amount-btn" data-amount="1m+">$1M+</button>
+                            </div>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>Buy/Sell</label>
+                            <div class="trade-type-buttons">
+                                <button class="type-btn active all" data-type="all">ALL</button>
+                                <button class="type-btn buy" data-type="buy">BUY</button>
+                                <button class="type-btn sell" data-type="sell">SELL</button>
+                            </div>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>From Date</label>
+                            <input type="date" id="dash-from">
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label>To Date</label>
+                            <input type="date" id="dash-to">
+                        </div>
+                    </aside>
+
+                    <!-- Visualizations -->
+                    <div class="viz-section">
+                        <h2 class="viz-title">🔥 Top 10 Insider Trades (Last 48 Hours)</h2>
+                        
+                        <div class="viz-grid">
+                            <!-- Top Buys -->
+                            <div class="chart-container">
+                                <h3 class="chart-title buy">Top 10 Buys</h3>
+                                <div id="top-buys-chart"></div>
+                            </div>
+                            
+                            <!-- Top Sells -->
+                            <div class="chart-container">
+                                <h3 class="chart-title sell">Top 10 Sells</h3>
+                                <div id="top-sells-chart"></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="filter-group">
-                        <label for="filter-date-to">To Date</label>
-                        <input 
-                            type="date" 
-                            id="filter-date-to" 
-                            class="filter-date-to"
-                            aria-label="Filter to date"
-                        >
+                </div>
+            </div>
+
+            <!-- Transactions Tab -->
+            <div class="tab-content" id="transactions-tab">
+                <div class="stats-bar" id="stats-bar" style="display: none;">
+                    <div class="stat-item">
+                        <span class="stat-label">Total Transactions</span>
+                        <span class="stat-value" id="stat-total">0</span>
                     </div>
-                </div>
-            </section>
-
-            <section class="stats-bar" id="stats-bar" style="display: none;">
-                <div class="stat-item">
-                    <span class="stat-label">Total Transactions</span>
-                    <span class="stat-value" id="stat-total">0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Total Buy Volume</span>
-                    <span class="stat-value" id="stat-buy-volume">$0</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-label">Total Sell Volume</span>
-                    <span class="stat-value" id="stat-sell-volume">$0</span>
-                </div>
-            </section>
-
-            <section class="table-section">
-                <div id="loading">
-                    <div class="spinner" role="status" aria-label="Loading data"></div>
-                    <p>Loading all insider trading transactions...</p>
-                </div>
-
-                <div id="error-message">
-                    <div class="error-content">
-                        <h3>⚠️ Error Loading Data</h3>
-                        <p>Unable to fetch insider trading data. Please check your connection and try again.</p>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Buy Volume</span>
+                        <span class="stat-value" id="stat-buy-volume">$0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Total Sell Volume</span>
+                        <span class="stat-value" id="stat-sell-volume">$0</span>
                     </div>
                 </div>
 
-                <div class="empty-state">
-                    <div class="empty-state-icon">📭</div>
-                    <h3>No Data Available</h3>
-                    <p>No insider trading transactions found for the selected date range.</p>
+                <div class="table-section">
+                    <div id="loading">
+                        <div class="spinner"></div>
+                        <p>Loading insider trading data...</p>
+                    </div>
+                    <div class="empty-state">
+                        <div style="font-size: 4rem; opacity: 0.3;">📭</div>
+                        <h3>No Data Available</h3>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="sortable" data-sort="filingDate">Filing Date</th>
+                                    <th class="sortable" data-sort="tradeDate">Trade Date</th>
+                                    <th class="sortable" data-sort="ticker">Ticker</th>
+                                    <th class="sortable" data-sort="name">Insider</th>
+                                    <th class="sortable" data-sort="type">Type</th>
+                                    <th class="sortable" data-sort="price">Price</th>
+                                    <th class="sortable" data-sort="qty">Qty</th>
+                                    <th class="sortable" data-sort="value">Value</th>
+                                    <th class="sortable" data-sort="owned">Owned After</th>
+                                    <th class="sortable" data-sort="change">Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="data-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
+            </div>
 
-                <div class="table-wrapper">
-                    <table role="table" aria-label="Insider trading data">
-                        <thead>
-                            <tr>
-                                <th class="sortable" data-sort="filingDate" role="columnheader">Filing Date</th>
-                                <th class="sortable" data-sort="tradeDate" role="columnheader">Trade Date</th>
-                                <th class="sortable" data-sort="ticker" role="columnheader">Ticker</th>
-                                <th class="sortable" data-sort="name" role="columnheader">Insider Name</th>
-                                <th class="sortable" data-sort="type" role="columnheader">Type</th>
-                                <th class="sortable" data-sort="price" role="columnheader">Price</th>
-                                <th class="sortable" data-sort="qty" role="columnheader">Qty</th>
-                                <th class="sortable" data-sort="value" role="columnheader">Value</th>
-                                <th class="sortable" data-sort="owned" role="columnheader">Owned After</th>
-                                <th class="sortable" data-sort="change" role="columnheader">Change</th>
-                            </tr>
-                        </thead>
-                        <tbody id="data-table-body">
-                        </tbody>
-                    </table>
+            <!-- Earnings Tab -->
+            <div class="tab-content" id="earnings-tab">
+                <div class="table-section">
+                    <div id="earnings-loading">
+                        <div class="spinner"></div>
+                        <p>Loading earnings calendar...</p>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="earnings-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Ticker</th>
+                                    <th>Company</th>
+                                    <th>EPS Est.</th>
+                                    <th>EPS Actual</th>
+                                    <th>Revenue Est.</th>
+                                    <th>Revenue Actual</th>
+                                </tr>
+                            </thead>
+                            <tbody id="earnings-table-body"></tbody>
+                        </table>
+                    </div>
                 </div>
-            </section>
+            </div>
         </div>
     </main>
 
     <footer>
         <div class="container">
             <div class="footer-content">
-                <p>
-                    Data provided by <a href="https://finnhub.io" target="_blank" rel="noopener noreferrer">Finnhub</a>
-                    | Built with ❤️ for investors
-                </p>
+                <p>Data provided by <a href="https://finnhub.io">Finnhub</a> | Built with ❤️ for investors</p>
             </div>
         </div>
     </footer>
