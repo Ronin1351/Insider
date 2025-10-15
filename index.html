@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Insider Trading Dashboard</title>
+    <title>Insider Trading + Earnings Dashboard</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
         * {
@@ -27,28 +27,145 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: var(--bg);
             color: var(--text);
             line-height: 1.5;
+            font-size: 15px;
             padding: 24px;
         }
 
         .container {
-            max-width: 1600px;
+            max-width: 1500px;
             margin: 0 auto;
         }
 
-        h1 {
-            font-size: 2rem;
-            margin-bottom: 24px;
-            font-weight: 700;
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(15, 21, 32, 0.95);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
         }
 
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(12, 1fr);
-            gap: 24px;
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid var(--border);
+            border-top-color: var(--info);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-left: 16px;
+            font-size: 16px;
+            color: var(--text);
+        }
+
+        /* Error Message */
+        .error-banner {
+            background: rgba(255, 107, 107, 0.15);
+            border: 1px solid var(--neg);
+            color: var(--neg);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        .error-banner.active {
+            display: block;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            padding: 12px 24px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: var(--text);
+        }
+
+        .tab-btn:focus-visible {
+            outline: 2px solid var(--info);
+            outline-offset: 2px;
+        }
+
+        .tab-btn.active {
+            color: var(--text);
+            border-bottom-color: var(--info);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        h1 {
+            font-size: 30px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .refresh-btn {
+            background: var(--info);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .refresh-btn:hover {
+            opacity: 0.9;
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .card {
@@ -56,114 +173,122 @@
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 24px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+            margin-bottom: 24px;
         }
 
-        .filter-panel {
-            grid-column: span 3;
+        /* Filters Card */
+        .filters-grid {
+            display: grid;
+            gap: 16px;
         }
 
-        .main-content {
-            grid-column: span 9;
+        .filters-row {
             display: flex;
-            flex-direction: column;
-            gap: 24px;
+            gap: 16px;
+            flex-wrap: wrap;
         }
 
-        .filter-group {
-            margin-bottom: 20px;
+        .filter-input-group {
+            flex: 0 0 340px;
         }
 
-        .filter-group label {
+        .filter-label {
             display: block;
-            font-size: 0.875rem;
+            font-size: 12px;
             font-weight: 600;
             color: var(--muted);
-            margin-bottom: 8px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+            margin-bottom: 8px;
         }
 
-        .filter-group input {
+        .filter-input {
             width: 100%;
             background: var(--chip);
             border: 1px solid var(--border);
             color: var(--text);
-            padding: 10px 12px;
+            padding: 10px 14px;
             border-radius: 8px;
-            font-size: 0.95rem;
-            transition: all 0.2s;
+            font-size: 15px;
         }
 
-        .filter-group input:focus {
+        .filter-input:focus-visible {
             outline: 2px solid var(--info);
             outline-offset: 2px;
-            border-color: var(--info);
         }
 
-        .chip-group {
+        .chip-row {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: column;
+        }
+
+        .chip-container {
+            display: flex;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .chip {
             background: var(--chip);
             border: 1px solid var(--border);
-            color: var(--muted);
-            padding: 8px 16px;
-            border-radius: 6px;
-            font-size: 0.875rem;
+            color: var(--text);
+            padding: 0 14px;
+            height: 36px;
+            border-radius: 10px;
+            font-size: 14px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
         }
 
         .chip:hover {
             background: var(--chip-active);
-            color: var(--text);
         }
 
-        .chip:focus {
+        .chip:focus-visible {
             outline: 2px solid var(--info);
             outline-offset: 2px;
         }
 
         .chip[aria-pressed="true"] {
             background: var(--chip-active);
-            color: var(--text);
-            border-color: var(--info);
+            outline: 1px solid var(--info);
         }
 
-        .charts-panel h2 {
-            font-size: 1.5rem;
-            margin-bottom: 24px;
-            font-weight: 600;
+        /* Charts Card */
+        .charts-title {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 20px;
         }
 
-        .charts-container {
+        .charts-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 24px;
         }
 
-        .chart-wrapper {
-            background: var(--chip);
-            border-radius: 8px;
-            padding: 20px;
+        .chart-subcard {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 16px;
         }
 
-        .chart-wrapper h3 {
-            font-size: 1.125rem;
-            margin-bottom: 16px;
+        .chart-subtitle {
+            font-size: 16px;
             font-weight: 600;
+            margin-bottom: 16px;
         }
 
-        .chart-wrapper.positive h3 {
+        .chart-subtitle.positive {
             color: var(--pos);
         }
 
-        .chart-wrapper.negative h3 {
+        .chart-subtitle.negative {
             color: var(--neg);
         }
 
@@ -171,6 +296,7 @@
             height: 400px;
         }
 
+        /* Table */
         .table-wrapper {
             overflow-x: auto;
         }
@@ -178,7 +304,7 @@
         table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 1200px;
+            min-width: 1100px;
         }
 
         thead {
@@ -190,13 +316,22 @@
 
         th {
             text-align: left;
-            padding: 12px 16px;
-            font-size: 0.75rem;
+            padding: 12px 12px;
+            font-size: 12px;
             font-weight: 700;
             color: var(--muter);
             text-transform: uppercase;
             letter-spacing: 0.5px;
             border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+        }
+
+        th.right {
+            text-align: right;
+        }
+
+        th.center {
+            text-align: center;
         }
 
         th button {
@@ -206,12 +341,12 @@
             font: inherit;
             cursor: pointer;
             padding: 0;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             gap: 4px;
         }
 
-        th button:focus {
+        th button:focus-visible {
             outline: 2px solid var(--info);
             outline-offset: 2px;
             border-radius: 4px;
@@ -220,15 +355,16 @@
         th button::after {
             content: '↕';
             opacity: 0.3;
+            font-size: 10px;
         }
 
         th button.sorted-asc::after {
-            content: '↑';
+            content: '▲';
             opacity: 1;
         }
 
         th button.sorted-desc::after {
-            content: '↓';
+            content: '▼';
             opacity: 1;
         }
 
@@ -238,54 +374,95 @@
         }
 
         tbody tr:hover {
-            background: rgba(76, 163, 255, 0.05);
+            background: rgba(255, 255, 255, 0.03);
         }
 
         td {
-            padding: 12px 16px;
-            font-size: 0.875rem;
+            padding: 12px 12px;
+            font-size: 14px;
         }
 
-        .ticker-badge {
+        td.right {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        td.center {
+            text-align: center;
+        }
+
+        .ticker-pill {
             display: inline-block;
             background: var(--chip);
             color: var(--text);
-            padding: 4px 12px;
-            border-radius: 12px;
+            padding: 4px 10px;
+            border-radius: 999px;
             font-weight: 600;
-            font-size: 0.8rem;
+            font-size: 13px;
         }
 
-        .type-tag {
+        .type-pill {
             display: inline-block;
             padding: 4px 12px;
             border-radius: 6px;
             font-weight: 600;
-            font-size: 0.75rem;
+            font-size: 13px;
         }
 
-        .type-tag.purchase {
+        .type-pill.p, .type-pill.purchase {
             background: rgba(107, 230, 117, 0.15);
             color: var(--pos);
         }
 
-        .type-tag.sale {
+        .type-pill.s, .type-pill.sale {
             background: rgba(255, 107, 107, 0.15);
             color: var(--neg);
         }
 
+        .rating-pill {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 13px;
+        }
+
+        .rating-pill.buy {
+            background: rgba(107, 230, 117, 0.15);
+            color: var(--pos);
+        }
+
+        .rating-pill.hold {
+            background: rgba(255, 193, 7, 0.15);
+            color: #FFC107;
+        }
+
+        .rating-pill.sell {
+            background: rgba(255, 107, 107, 0.15);
+            color: var(--neg);
+        }
+
+        .positive-val {
+            color: var(--pos);
+        }
+
+        .negative-val {
+            color: var(--neg);
+        }
+
+        /* Pagination */
         .pagination {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 20px;
-            padding-top: 20px;
+            margin-top: 16px;
+            padding-top: 16px;
             border-top: 1px solid var(--border);
         }
 
         .pagination-info {
             color: var(--muted);
-            font-size: 0.875rem;
+            font-size: 14px;
         }
 
         .pagination-controls {
@@ -298,16 +475,14 @@
             border: 1px solid var(--border);
             color: var(--text);
             padding: 8px 16px;
-            border-radius: 6px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 14px;
             font-weight: 600;
-            transition: all 0.2s;
         }
 
         .pagination button:hover:not(:disabled) {
             background: var(--chip-active);
-            border-color: var(--info);
         }
 
         .pagination button:disabled {
@@ -315,30 +490,55 @@
             cursor: not-allowed;
         }
 
-        .pagination button:focus {
+        .pagination button:focus-visible {
             outline: 2px solid var(--info);
             outline-offset: 2px;
         }
 
-        @media (max-width: 1280px) {
-            .filter-panel {
-                grid-column: span 4;
-            }
-            .main-content {
-                grid-column: span 8;
-            }
+        /* Earnings specific */
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .search-input-group {
+            flex: 1;
+            max-width: 400px;
+        }
+
+        .download-btn {
+            background: var(--info);
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+
+        .download-btn:hover {
+            opacity: 0.9;
+        }
+
+        .download-btn:focus-visible {
+            outline: 2px solid var(--info);
+            outline-offset: 2px;
         }
 
         @media (max-width: 1024px) {
-            .charts-container {
+            .charts-grid {
                 grid-template-columns: 1fr;
             }
-            
-            .filter-panel {
-                grid-column: span 12;
+
+            .filters-row {
+                flex-direction: column;
             }
-            .main-content {
-                grid-column: span 12;
+
+            .filter-input-group {
+                flex: 1 1 100%;
             }
         }
 
@@ -346,186 +546,269 @@
             body {
                 padding: 16px;
             }
-            
-            h1 {
-                font-size: 1.5rem;
-            }
-            
+
             .card {
                 padding: 16px;
+            }
+
+            h1 {
+                font-size: 24px;
             }
         }
     </style>
 </head>
 <body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Loading data...</div>
+    </div>
+
     <div class="container">
-        <h1>Insider Trading Dashboard</h1>
-        
-        <div class="grid">
-            <!-- Filter Panel -->
-            <aside class="card filter-panel">
-                <div class="filter-group">
-                    <label for="ticker-input">Ticker</label>
-                    <input type="text" id="ticker-input" placeholder="Enter ticker (ex. TSLA)">
-                </div>
+        <!-- Error Banner -->
+        <div class="error-banner" id="error-banner"></div>
 
-                <div class="filter-group">
-                    <label for="insider-input">Insider</label>
-                    <input type="text" id="insider-input" placeholder="Enter name (ex. Zuckerberg)">
-                </div>
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="insider">Insider Trades</button>
+            <button class="tab-btn" data-tab="earnings">Earnings Calendar</button>
+        </div>
 
-                <div class="filter-group">
-                    <label>Amount</label>
-                    <div class="chip-group" role="group" aria-label="Amount filter">
-                        <button class="chip" role="button" aria-pressed="true" data-amount="all">ALL</button>
-                        <button class="chip" role="button" aria-pressed="false" data-amount="1-100k">$1–$100K</button>
-                        <button class="chip" role="button" aria-pressed="false" data-amount="100k-1m">$100K–$1M</button>
-                        <button class="chip" role="button" aria-pressed="false" data-amount="1m+">$1M+</button>
-                    </div>
-                </div>
+        <!-- Insider Trades Tab -->
+        <div class="tab-content active" id="insider-tab">
+            <h1>
+                Insider Trading Dashboard
+                <button class="refresh-btn" id="refresh-insider">
+                    <span>↻</span>
+                    <span>Refresh</span>
+                </button>
+            </h1>
 
-                <div class="filter-group">
-                    <label>Buy/Sell</label>
-                    <div class="chip-group" role="group" aria-label="Transaction type filter">
-                        <button class="chip" role="button" aria-pressed="true" data-side="all">ALL</button>
-                        <button class="chip" role="button" aria-pressed="false" data-side="both">BUY+SELL</button>
-                        <button class="chip" role="button" aria-pressed="false" data-side="buy">BUY</button>
-                        <button class="chip" role="button" aria-pressed="false" data-side="sell">SELL</button>
-                    </div>
-                </div>
-            </aside>
-
-            <!-- Main Content -->
-            <main class="main-content">
-                <!-- Charts Panel -->
-                <section class="card charts-panel">
-                    <h2>Top 10 Stocks by Net Insider Trading (Last 48 Hours)</h2>
-                    <div class="charts-container">
-                        <div class="chart-wrapper positive">
-                            <h3>Positive Net (Buys)</h3>
-                            <div class="chart-canvas">
-                                <canvas id="positive-chart"></canvas>
-                            </div>
+            <!-- Filters Card -->
+            <div class="card">
+                <div class="filters-grid">
+                    <div class="filters-row">
+                        <div class="filter-input-group">
+                            <label class="filter-label" for="ticker-input">Ticker</label>
+                            <input type="text" id="ticker-input" class="filter-input" placeholder="Enter ticker (ex. TSLA)">
                         </div>
-                        <div class="chart-wrapper negative">
-                            <h3>Negative Net (Sells)</h3>
-                            <div class="chart-canvas">
-                                <canvas id="negative-chart"></canvas>
-                            </div>
+                        <div class="filter-input-group">
+                            <label class="filter-label" for="insider-input">Insider</label>
+                            <input type="text" id="insider-input" class="filter-input" placeholder="Enter name (ex. Zuckerberg)">
                         </div>
                     </div>
-                </section>
 
-                <!-- Trades Table -->
-                <section class="card">
-                    <div class="table-wrapper">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Title</th>
-                                    <th>Ticker</th>
-                                    <th>
-                                        <button data-sort="reported">Reported</button>
-                                    </th>
-                                    <th>
-                                        <button data-sort="traded">Traded</button>
-                                    </th>
-                                    <th>Delay</th>
-                                    <th>Type</th>
-                                    <th>Size</th>
-                                    <th>Price</th>
-                                    <th>
-                                        <button data-sort="amount">Amount</button>
-                                    </th>
-                                    <th>Owned</th>
-                                    <th>% Owned</th>
-                                </tr>
-                            </thead>
-                            <tbody id="trades-tbody"></tbody>
-                        </table>
-                    </div>
-                    <div class="pagination">
-                        <div class="pagination-info">
-                            <span id="pagination-info">Showing 0-0 of 0 trades</span>
-                        </div>
-                        <div class="pagination-controls">
-                            <button id="prev-page">Previous</button>
-                            <button id="next-page">Next</button>
+                    <div class="chip-row">
+                        <label class="filter-label">Amount</label>
+                        <div class="chip-container">
+                            <button class="chip" role="button" aria-pressed="true" data-amount="all">ALL</button>
+                            <button class="chip" role="button" aria-pressed="false" data-amount="1-100k">$1–$100K</button>
+                            <button class="chip" role="button" aria-pressed="false" data-amount="100k-1m">$100K–$1M</button>
+                            <button class="chip" role="button" aria-pressed="false" data-amount="1m+">$1M+</button>
                         </div>
                     </div>
-                </section>
-            </main>
+
+                    <div class="chip-row">
+                        <label class="filter-label">Buy/Sell</label>
+                        <div class="chip-container">
+                            <button class="chip" role="button" aria-pressed="true" data-side="all">ALL</button>
+                            <button class="chip" role="button" aria-pressed="false" data-side="buy">BUY</button>
+                            <button class="chip" role="button" aria-pressed="false" data-side="sell">SELL</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Card -->
+            <div class="card">
+                <h2 class="charts-title">Top 10 Stocks by Net Insider Trading (Last 48 Hours)</h2>
+                <div class="charts-grid">
+                    <div class="chart-subcard">
+                        <h3 class="chart-subtitle positive">Positive Net (Buys)</h3>
+                        <div class="chart-canvas">
+                            <canvas id="positive-chart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-subcard">
+                        <h3 class="chart-subtitle negative">Negative Net (Sells)</h3>
+                        <div class="chart-canvas">
+                            <canvas id="negative-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trades Table Card -->
+            <div class="card">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Name</th>
+                                <th scope="col">Ticker</th>
+                                <th scope="col">
+                                    <button data-sort="filingDate">Filing Date</button>
+                                </th>
+                                <th scope="col">
+                                    <button data-sort="transactionDate">Transaction Date</button>
+                                </th>
+                                <th scope="col" class="center">Type</th>
+                                <th scope="col" class="right">Shares</th>
+                                <th scope="col" class="right">Price</th>
+                                <th scope="col" class="right">
+                                    <button data-sort="value">Value</button>
+                                </th>
+                                <th scope="col" class="right">Owned After</th>
+                                <th scope="col" class="right">Change %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trades-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <div class="pagination-info">
+                        <span id="pagination-info">Showing 0-0 of 0 trades</span>
+                    </div>
+                    <div class="pagination-controls">
+                        <button id="prev-page">Previous</button>
+                        <button id="next-page">Next</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Earnings Calendar Tab -->
+        <div class="tab-content" id="earnings-tab">
+            <h1>
+                Earnings Calendar
+                <button class="refresh-btn" id="refresh-earnings">
+                    <span>↻</span>
+                    <span>Refresh</span>
+                </button>
+            </h1>
+
+            <!-- Filters Card -->
+            <div class="card">
+                <div class="filters-grid">
+                    <div class="search-bar">
+                        <div class="search-input-group">
+                            <label class="filter-label" for="earnings-search">Search Ticker</label>
+                            <input type="text" id="earnings-search" class="filter-input" placeholder="Enter ticker (ex. TSLA)">
+                        </div>
+                        <div class="search-input-group">
+                            <label class="filter-label" for="earnings-from">From Date</label>
+                            <input type="date" id="earnings-from" class="filter-input">
+                        </div>
+                        <div class="search-input-group">
+                            <label class="filter-label" for="earnings-to">To Date</label>
+                            <input type="date" id="earnings-to" class="filter-input">
+                        </div>
+                        <button class="download-btn" id="download-csv">Download CSV</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Earnings Table Card -->
+            <div class="card">
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">Ticker</th>
+                                <th scope="col">
+                                    <button data-sort="date">Date</button>
+                                </th>
+                                <th scope="col" class="right">EPS Est.</th>
+                                <th scope="col" class="right">EPS Act.</th>
+                                <th scope="col" class="right">Revenue Est.</th>
+                                <th scope="col" class="right">Revenue Act.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="earnings-tbody"></tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <div class="pagination-info">
+                        <span id="earnings-pagination-info">Showing 0-0 of 0 earnings</span>
+                    </div>
+                    <div class="pagination-controls">
+                        <button id="earnings-prev-page">Previous</button>
+                        <button id="earnings-next-page">Next</button>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Sample Data -->
-    <script type="application/json" id="seed">
-    {
-        "trades": [
-            {"name": "Elon Musk", "title": "CEO", "ticker": "TSLA", "reported": "2024-10-14", "traded": "2024-10-12", "delay_days": 2, "type": "Purchase", "size": 50000, "price": 242.50, "amount": 12125000, "owned": 2500000, "pct_owned_change": 2.04},
-            {"name": "Mark Zuckerberg", "title": "CEO", "ticker": "META", "reported": "2024-10-14", "traded": "2024-10-11", "delay_days": 3, "type": "Sale", "size": 75000, "price": 495.80, "amount": 37185000, "owned": 35000000, "pct_owned_change": -0.21},
-            {"name": "Tim Cook", "title": "CEO", "ticker": "AAPL", "reported": "2024-10-13", "traded": "2024-10-10", "delay_days": 3, "type": "Purchase", "size": 25000, "price": 178.20, "amount": 4455000, "owned": 800000, "pct_owned_change": 3.23},
-            {"name": "Satya Nadella", "title": "CEO", "ticker": "MSFT", "reported": "2024-10-13", "traded": "2024-10-09", "delay_days": 4, "type": "Sale", "size": 40000, "price": 415.30, "amount": 16612000, "owned": 5000000, "pct_owned_change": -0.79},
-            {"name": "Jensen Huang", "title": "CEO", "ticker": "NVDA", "reported": "2024-10-13", "traded": "2024-10-11", "delay_days": 2, "type": "Purchase", "size": 100000, "price": 135.50, "amount": 13550000, "owned": 3500000, "pct_owned_change": 2.94},
-            {"name": "Lisa Su", "title": "CEO", "ticker": "AMD", "reported": "2024-10-12", "traded": "2024-10-10", "delay_days": 2, "type": "Purchase", "size": 35000, "price": 142.75, "amount": 4996250, "owned": 1200000, "pct_owned_change": 3.00},
-            {"name": "Andy Jassy", "title": "CEO", "ticker": "AMZN", "reported": "2024-10-12", "traded": "2024-10-09", "delay_days": 3, "type": "Sale", "size": 60000, "price": 178.90, "amount": 10734000, "owned": 8000000, "pct_owned_change": -0.74},
-            {"name": "Sundar Pichai", "title": "CEO", "ticker": "GOOGL", "reported": "2024-10-14", "traded": "2024-10-12", "delay_days": 2, "type": "Sale", "size": 45000, "price": 165.20, "amount": 7434000, "owned": 6500000, "pct_owned_change": -0.69},
-            {"name": "Brian Chesky", "title": "CEO", "ticker": "ABNB", "reported": "2024-10-11", "traded": "2024-10-08", "delay_days": 3, "type": "Purchase", "size": 15000, "price": 128.40, "amount": 1926000, "owned": 450000, "pct_owned_change": 3.45},
-            {"name": "Reed Hastings", "title": "Co-CEO", "ticker": "NFLX", "reported": "2024-10-11", "traded": "2024-10-09", "delay_days": 2, "type": "Sale", "size": 30000, "price": 695.50, "amount": 20865000, "owned": 2500000, "pct_owned_change": -1.19},
-            {"name": "Marc Benioff", "title": "CEO", "ticker": "CRM", "reported": "2024-10-13", "traded": "2024-10-11", "delay_days": 2, "type": "Purchase", "size": 20000, "price": 295.75, "amount": 5915000, "owned": 900000, "pct_owned_change": 2.27},
-            {"name": "Pat Gelsinger", "title": "CEO", "ticker": "INTC", "reported": "2024-10-10", "traded": "2024-10-07", "delay_days": 3, "type": "Purchase", "size": 50000, "price": 22.35, "amount": 1117500, "owned": 600000, "pct_owned_change": 9.09},
-            {"name": "Jamie Dimon", "title": "CEO", "ticker": "JPM", "reported": "2024-10-12", "traded": "2024-10-10", "delay_days": 2, "type": "Sale", "size": 35000, "price": 205.40, "amount": 7189000, "owned": 4000000, "pct_owned_change": -0.87},
-            {"name": "Mary Barra", "title": "CEO", "ticker": "GM", "reported": "2024-10-11", "traded": "2024-10-09", "delay_days": 2, "type": "Purchase", "size": 40000, "price": 48.20, "amount": 1928000, "owned": 1500000, "pct_owned_change": 2.74},
-            {"name": "Darren Woods", "title": "CEO", "ticker": "XOM", "reported": "2024-10-14", "traded": "2024-10-12", "delay_days": 2, "type": "Sale", "size": 28000, "price": 118.90, "amount": 3329200, "owned": 3500000, "pct_owned_change": -0.79},
-            {"name": "Jim Farley", "title": "CEO", "ticker": "F", "reported": "2024-10-10", "traded": "2024-10-08", "delay_days": 2, "type": "Purchase", "size": 80000, "price": 11.85, "amount": 948000, "owned": 2000000, "pct_owned_change": 4.17},
-            {"name": "David Solomon", "title": "CEO", "ticker": "GS", "reported": "2024-10-13", "traded": "2024-10-10", "delay_days": 3, "type": "Sale", "size": 25000, "price": 485.30, "amount": 12132500, "owned": 1800000, "pct_owned_change": -1.37},
-            {"name": "Brian Moynihan", "title": "CEO", "ticker": "BAC", "reported": "2024-10-12", "traded": "2024-10-09", "delay_days": 3, "type": "Purchase", "size": 100000, "price": 40.15, "amount": 4015000, "owned": 5000000, "pct_owned_change": 2.04},
-            {"name": "Ken Chenault", "title": "Director", "ticker": "AMEX", "reported": "2024-10-14", "traded": "2024-10-12", "delay_days": 2, "type": "Sale", "size": 15000, "price": 252.60, "amount": 3789000, "owned": 800000, "pct_owned_change": -1.84},
-            {"name": "Carol Tomé", "title": "CEO", "ticker": "UPS", "reported": "2024-10-11", "traded": "2024-10-08", "delay_days": 3, "type": "Purchase", "size": 30000, "price": 132.45, "amount": 3973500, "owned": 1200000, "pct_owned_change": 2.56},
-            {"name": "Greg Abel", "title": "Vice Chair", "ticker": "BRK.B", "reported": "2024-10-13", "traded": "2024-10-11", "delay_days": 2, "type": "Purchase", "size": 5000, "price": 445.80, "amount": 2229000, "owned": 150000, "pct_owned_change": 3.45},
-            {"name": "Doug McMillon", "title": "CEO", "ticker": "WMT", "reported": "2024-10-12", "traded": "2024-10-10", "delay_days": 2, "type": "Sale", "size": 50000, "price": 168.30, "amount": 8415000, "owned": 3000000, "pct_owned_change": -1.64},
-            {"name": "Bob Iger", "title": "CEO", "ticker": "DIS", "reported": "2024-10-14", "traded": "2024-10-11", "delay_days": 3, "type": "Purchase", "size": 40000, "price": 95.25, "amount": 3810000, "owned": 1800000, "pct_owned_change": 2.27},
-            {"name": "Arvind Krishna", "title": "CEO", "ticker": "IBM", "reported": "2024-10-10", "traded": "2024-10-07", "delay_days": 3, "type": "Sale", "size": 35000, "price": 212.50, "amount": 7437500, "owned": 2500000, "pct_owned_change": -1.38},
-            {"name": "John Stankey", "title": "CEO", "ticker": "T", "reported": "2024-10-11", "traded": "2024-10-09", "delay_days": 2, "type": "Purchase", "size": 120000, "price": 21.45, "amount": 2574000, "owned": 4000000, "pct_owned_change": 3.09},
-            {"name": "Albert Bourla", "title": "CEO", "ticker": "PFE", "reported": "2024-10-13", "traded": "2024-10-11", "delay_days": 2, "type": "Sale", "size": 60000, "price": 28.90, "amount": 1734000, "owned": 3500000, "pct_owned_change": -1.69},
-            {"name": "Shantanu Narayen", "title": "CEO", "ticker": "ADBE", "reported": "2024-10-12", "traded": "2024-10-10", "delay_days": 2, "type": "Purchase", "size": 12000, "price": 505.20, "amount": 6062400, "owned": 500000, "pct_owned_change": 2.46},
-            {"name": "Karen Lynch", "title": "CEO", "ticker": "CVS", "reported": "2024-10-14", "traded": "2024-10-12", "delay_days": 2, "type": "Sale", "size": 40000, "price": 58.75, "amount": 2350000, "owned": 2000000, "pct_owned_change": -1.96},
-            {"name": "Hans Vestberg", "title": "CEO", "ticker": "VZ", "reported": "2024-10-11", "traded": "2024-10-08", "delay_days": 3, "type": "Purchase", "size": 90000, "price": 42.30, "amount": 3807000, "owned": 3500000, "pct_owned_change": 2.64},
-            {"name": "Ted Sarandos", "title": "Co-CEO", "ticker": "NFLX", "reported": "2024-10-10", "traded": "2024-10-08", "delay_days": 2, "type": "Sale", "size": 20000, "price": 692.40, "amount": 13848000, "owned": 1500000, "pct_owned_change": -1.32}
-        ]
-    }
-    </script>
-
     <script>
-        // Utility functions
-        function money(val) {
+        // API Configuration
+        const API_BASE = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000/api'
+            : '/api';
+
+        // Utilities
+        function fmtMoney(val) {
+            if (!val && val !== 0) return '—';
+            return '$' + val.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        function fmtMoneyShort(val) {
+            if (!val && val !== 0) return '—';
             const abs = Math.abs(val);
-            if (abs >= 1e9) return '$' + (val / 1e9).toFixed(2) + 'B';
-            if (abs >= 1e6) return '$' + (val / 1e6).toFixed(2) + 'M';
+            if (abs >= 1e9) return '$' + (val / 1e9).toFixed(1) + 'B';
+            if (abs >= 1e6) return '$' + (val / 1e6).toFixed(1) + 'M';
             if (abs >= 1e3) return '$' + (val / 1e3).toFixed(1) + 'K';
             return '$' + val.toFixed(0);
         }
 
-        function number(val) {
+        function fmtNum(val) {
+            if (!val && val !== 0) return '—';
             return val.toLocaleString('en-US');
         }
 
-        function pct(val) {
+        function fmtPct(val) {
+            if (!val && val !== 0) return '—';
             return (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
+        }
+
+        function debounce(fn, delay) {
+            let timer;
+            return function(...args) {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn.apply(this, args), delay);
+            };
+        }
+
+        function showLoading() {
+            document.getElementById('loading-overlay').classList.add('active');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.remove('active');
+        }
+
+        function showError(message) {
+            const banner = document.getElementById('error-banner');
+            banner.textContent = message;
+            banner.classList.add('active');
+            setTimeout(() => banner.classList.remove('active'), 5000);
         }
 
         // State
         let allTrades = [];
+        let allEarnings = [];
         let filteredTrades = [];
+        let filteredEarnings = [];
         let currentPage = 1;
+        let earningsCurrentPage = 1;
         const rowsPerPage = 25;
         let sortColumn = null;
         let sortDirection = 'desc';
+        let earningsSortColumn = null;
+        let earningsSortDirection = 'desc';
         let positiveChart = null;
         let negativeChart = null;
 
-        // Filters state
         const filters = {
             ticker: '',
             insider: '',
@@ -533,43 +816,107 @@
             side: 'all'
         };
 
-        // Load data
-        function loadData() {
-            const seedData = JSON.parse(document.getElementById('seed').textContent);
-            allTrades = seedData.trades;
-            applyFilters();
+        const earningsFilters = {
+            search: '',
+            from: '',
+            to: ''
+        };
+
+        // API Calls
+        async function fetchInsiderTrades() {
+            try {
+                showLoading();
+                const response = await fetch(`${API_BASE}/insider-trades`);
+                if (!response.ok) throw new Error('Failed to fetch insider trades');
+                const data = await response.json();
+                allTrades = data.data || [];
+                applyFilters();
+                hideLoading();
+            } catch (error) {
+                console.error('Error fetching insider trades:', error);
+                showError('Failed to load insider trades. Please try again.');
+                hideLoading();
+            }
+        }
+
+        async function fetchEarnings() {
+            try {
+                showLoading();
+                const params = new URLSearchParams();
+                if (earningsFilters.from) params.append('from', earningsFilters.from);
+                if (earningsFilters.to) params.append('to', earningsFilters.to);
+                
+                const response = await fetch(`${API_BASE}/earnings?${params.toString()}`);
+                if (!response.ok) throw new Error('Failed to fetch earnings');
+                const data = await response.json();
+                allEarnings = data.earningsCalendar || [];
+                applyEarningsFilters();
+                hideLoading();
+            } catch (error) {
+                console.error('Error fetching earnings:', error);
+                showError('Failed to load earnings calendar. Please try again.');
+                hideLoading();
+            }
+        }
+
+        // Recompute net trading
+        function recomputeNet(trades) {
+            const netByTicker = {};
+            
+            const now = new Date();
+            const fortyEightHoursAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+            
+            trades.forEach(trade => {
+                const filingDate = new Date(trade.filingDate);
+                if (filingDate < fortyEightHoursAgo) return;
+                
+                if (!netByTicker[trade.symbol]) {
+                    netByTicker[trade.symbol] = 0;
+                }
+                
+                const value = (trade.share || 0) * (trade.transactionPrice || 0);
+                netByTicker[trade.symbol] += trade.transactionCode === 'P' ? value : -value;
+            });
+
+            const positive = [];
+            const negative = [];
+
+            Object.entries(netByTicker).forEach(([ticker, net]) => {
+                if (net > 0) {
+                    positive.push({ ticker, value: net });
+                } else if (net < 0) {
+                    negative.push({ ticker, value: Math.abs(net) });
+                }
+            });
+
+            positive.sort((a, b) => b.value - a.value);
+            negative.sort((a, b) => b.value - a.value);
+
+            return {
+                positive: positive.slice(0, 10),
+                negative: negative.slice(0, 10)
+            };
         }
 
         // Apply filters
         function applyFilters() {
             filteredTrades = allTrades.filter(trade => {
-                // Ticker filter
-                if (filters.ticker && !trade.ticker.toLowerCase().includes(filters.ticker.toLowerCase())) {
+                if (filters.ticker && !trade.symbol.toLowerCase().includes(filters.ticker.toLowerCase())) {
                     return false;
                 }
-
-                // Insider filter
                 if (filters.insider && !trade.name.toLowerCase().includes(filters.insider.toLowerCase())) {
                     return false;
                 }
-
-                // Amount filter
+                const value = (trade.share || 0) * (trade.transactionPrice || 0);
                 if (filters.amount !== 'all') {
-                    if (filters.amount === '1-100k' && (trade.amount < 1 || trade.amount > 100000)) return false;
-                    if (filters.amount === '100k-1m' && (trade.amount < 100000 || trade.amount > 1000000)) return false;
-                    if (filters.amount === '1m+' && trade.amount < 1000000) return false;
+                    if (filters.amount === '1-100k' && (value < 1 || value > 100000)) return false;
+                    if (filters.amount === '100k-1m' && (value < 100000 || value > 1000000)) return false;
+                    if (filters.amount === '1m+' && value < 1000000) return false;
                 }
-
-                // Side filter
                 if (filters.side !== 'all') {
-                    if (filters.side === 'buy' && trade.type !== 'Purchase') return false;
-                    if (filters.side === 'sell' && trade.type !== 'Sale') return false;
-                    if (filters.side === 'both') {
-                        // Show trades where insider both bought and sold (for demo, we'll show all)
-                        // In a real app, this would aggregate by insider
-                    }
+                    if (filters.side === 'buy' && trade.transactionCode !== 'P') return false;
+                    if (filters.side === 'sell' && trade.transactionCode !== 'S') return false;
                 }
-
                 return true;
             });
 
@@ -581,49 +928,20 @@
 
         // Update charts
         function updateCharts() {
-            // Calculate net trading by ticker
-            const netByTicker = {};
-            
-            filteredTrades.forEach(trade => {
-                if (!netByTicker[trade.ticker]) {
-                    netByTicker[trade.ticker] = 0;
-                }
-                netByTicker[trade.ticker] += trade.type === 'Purchase' ? trade.amount : -trade.amount;
-            });
+            const netData = recomputeNet(filteredTrades);
 
-            // Split into positive and negative
-            const positive = [];
-            const negative = [];
-
-            Object.entries(netByTicker).forEach(([ticker, net]) => {
-                if (net > 0) {
-                    positive.push({ ticker, net });
-                } else if (net < 0) {
-                    negative.push({ ticker, net: Math.abs(net) });
-                }
-            });
-
-            // Sort and take top 10
-            positive.sort((a, b) => b.net - a.net);
-            negative.sort((a, b) => b.net - a.net);
-
-            const topPositive = positive.slice(0, 10);
-            const topNegative = negative.slice(0, 10);
-
-            // Update positive chart
-            if (positiveChart) {
-                positiveChart.destroy();
-            }
+            if (positiveChart) positiveChart.destroy();
             
             const posCtx = document.getElementById('positive-chart').getContext('2d');
             positiveChart = new Chart(posCtx, {
                 type: 'bar',
                 data: {
-                    labels: topPositive.map(d => d.ticker),
+                    labels: netData.positive.map(d => d.ticker),
                     datasets: [{
-                        data: topPositive.map(d => d.net),
+                        data: netData.positive.map(d => d.value),
                         backgroundColor: '#6BE675',
-                        borderRadius: 4
+                        borderRadius: 6,
+                        barThickness: 24
                     }]
                 },
                 options: {
@@ -634,40 +952,38 @@
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (context) => money(context.parsed.x)
+                                label: (ctx) => `${ctx.label}  ${fmtMoneyShort(ctx.raw)}`
                             }
                         }
                     },
                     scales: {
                         x: {
-                            grid: { color: '#1E2636' },
+                            grid: { color: 'rgba(255, 255, 255, 0.06)' },
                             ticks: {
                                 color: '#9FB0C7',
-                                callback: (val) => money(val)
+                                callback: (v) => fmtMoneyShort(v)
                             }
                         },
                         y: {
                             grid: { display: false },
-                            ticks: { color: '#E6EDF7', font: { weight: 'bold' } }
+                            ticks: { color: '#9FB0C7', font: { weight: 'bold' } }
                         }
                     }
                 }
             });
 
-            // Update negative chart
-            if (negativeChart) {
-                negativeChart.destroy();
-            }
+            if (negativeChart) negativeChart.destroy();
             
             const negCtx = document.getElementById('negative-chart').getContext('2d');
             negativeChart = new Chart(negCtx, {
                 type: 'bar',
                 data: {
-                    labels: topNegative.map(d => d.ticker),
+                    labels: netData.negative.map(d => d.ticker),
                     datasets: [{
-                        data: topNegative.map(d => d.net),
+                        data: netData.negative.map(d => d.value),
                         backgroundColor: '#FF6B6B',
-                        borderRadius: 4
+                        borderRadius: 6,
+                        barThickness: 24
                     }]
                 },
                 options: {
@@ -678,21 +994,21 @@
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (context) => money(context.parsed.x)
+                                label: (ctx) => `${ctx.label}  ${fmtMoneyShort(ctx.raw)}`
                             }
                         }
                     },
                     scales: {
                         x: {
-                            grid: { color: '#1E2636' },
+                            grid: { color: 'rgba(255, 255, 255, 0.06)' },
                             ticks: {
                                 color: '#9FB0C7',
-                                callback: (val) => money(val)
+                                callback: (v) => fmtMoneyShort(v)
                             }
                         },
                         y: {
                             grid: { display: false },
-                            ticks: { color: '#E6EDF7', font: { weight: 'bold' } }
+                            ticks: { color: '#9FB0C7', font: { weight: 'bold' } }
                         }
                     }
                 }
@@ -703,16 +1019,20 @@
         function updateTable() {
             const tbody = document.getElementById('trades-tbody');
             
-            // Apply sorting
             let sorted = [...filteredTrades];
             if (sortColumn) {
                 sorted.sort((a, b) => {
                     let valA = a[sortColumn];
                     let valB = b[sortColumn];
                     
-                    if (sortColumn === 'reported' || sortColumn === 'traded') {
+                    if (sortColumn === 'filingDate' || sortColumn === 'transactionDate') {
                         valA = new Date(valA);
                         valB = new Date(valB);
+                    }
+                    
+                    if (sortColumn === 'value') {
+                        valA = (a.share || 0) * (a.transactionPrice || 0);
+                        valB = (b.share || 0) * (b.transactionPrice || 0);
                     }
                     
                     if (sortDirection === 'asc') {
@@ -723,30 +1043,30 @@
                 });
             }
 
-            // Pagination
             const start = (currentPage - 1) * rowsPerPage;
             const end = start + rowsPerPage;
             const page = sorted.slice(start, end);
 
-            // Render rows
-            tbody.innerHTML = page.map(trade => `
-                <tr>
-                    <td>${trade.name}</td>
-                    <td>${trade.title}</td>
-                    <td><span class="ticker-badge">${trade.ticker}</span></td>
-                    <td>${trade.reported}</td>
-                    <td>${trade.traded}</td>
-                    <td>${trade.delay_days}d</td>
-                    <td><span class="type-tag ${trade.type.toLowerCase()}">${trade.type}</span></td>
-                    <td>${number(trade.size)}</td>
-                    <td>$${trade.price.toFixed(2)}</td>
-                    <td>${money(trade.amount)}</td>
-                    <td>${number(trade.owned)}</td>
-                    <td>${pct(trade.pct_owned_change)}</td>
-                </tr>
-            `).join('');
+            tbody.innerHTML = page.map(trade => {
+                const value = (trade.share || 0) * (trade.transactionPrice || 0);
+                const changePercent = trade.change ? ((trade.share / (trade.shareHoldingAfter - trade.share)) * 100) : 0;
+                
+                return `
+                    <tr>
+                        <td>${trade.name || '—'}</td>
+                        <td><span class="ticker-pill">${trade.symbol}</span></td>
+                        <td>${trade.filingDate || '—'}</td>
+                        <td>${trade.transactionDate || '—'}</td>
+                        <td class="center"><span class="type-pill ${trade.transactionCode?.toLowerCase()}">${trade.transactionCode === 'P' ? 'Purchase' : 'Sale'}</span></td>
+                        <td class="right">${fmtNum(trade.share)}</td>
+                        <td class="right">${fmtMoney(trade.transactionPrice)}</td>
+                        <td class="right">${fmtMoneyShort(value)}</td>
+                        <td class="right">${fmtNum(trade.shareHoldingAfter)}</td>
+                        <td class="right">${changePercent ? fmtPct(changePercent) : '—'}</td>
+                    </tr>
+                `;
+            }).join('');
 
-            // Update pagination info
             document.getElementById('pagination-info').textContent = 
                 `Showing ${start + 1}-${Math.min(end, sorted.length)} of ${sorted.length} trades`;
             
@@ -766,48 +1086,99 @@
             window.history.replaceState({}, '', url);
         }
 
-        // Initialize from URL
-        function initFromURL() {
-            const params = new URLSearchParams(window.location.search);
-            filters.ticker = params.get('ticker') || '';
-            filters.insider = params.get('insider') || '';
-            filters.amount = params.get('amount') || 'all';
-            filters.side = params.get('side') || 'all';
-
-            document.getElementById('ticker-input').value = filters.ticker;
-            document.getElementById('insider-input').value = filters.insider;
-
-            // Update chip states
-            document.querySelectorAll('[data-amount]').forEach(btn => {
-                btn.setAttribute('aria-pressed', btn.dataset.amount === filters.amount);
+        // Earnings filters
+        function applyEarningsFilters() {
+            filteredEarnings = allEarnings.filter(earning => {
+                if (earningsFilters.search && !earning.symbol.toLowerCase().includes(earningsFilters.search.toLowerCase())) {
+                    return false;
+                }
+                return true;
             });
-            document.querySelectorAll('[data-side]').forEach(btn => {
-                btn.setAttribute('aria-pressed', btn.dataset.side === filters.side);
-            });
+
+            earningsCurrentPage = 1;
+            updateEarningsTable();
         }
 
-        // Event listeners
-        let debounceTimer;
-        function debounce(func, delay) {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(func, delay);
+        // Update earnings table
+        function updateEarningsTable() {
+            const tbody = document.getElementById('earnings-tbody');
+            
+            let sorted = [...filteredEarnings];
+            if (earningsSortColumn) {
+                sorted.sort((a, b) => {
+                    let valA = a[earningsSortColumn];
+                    let valB = b[earningsSortColumn];
+                    
+                    if (earningsSortColumn === 'date') {
+                        valA = new Date(a.date);
+                        valB = new Date(b.date);
+                    }
+                    
+                    if (valA === null) return 1;
+                    if (valB === null) return -1;
+                    
+                    if (earningsSortDirection === 'asc') {
+                        return valA > valB ? 1 : -1;
+                    } else {
+                        return valA < valB ? 1 : -1;
+                    }
+                });
+            }
+
+            const start = (earningsCurrentPage - 1) * rowsPerPage;
+            const end = start + rowsPerPage;
+            const page = sorted.slice(start, end);
+
+            tbody.innerHTML = page.map(e => `
+                <tr>
+                    <td><span class="ticker-pill">${e.symbol}</span></td>
+                    <td>${e.date || '—'} ${e.hour || ''}</td>
+                    <td class="right">${fmtMoney(e.epsEstimate)}</td>
+                    <td class="right">${fmtMoney(e.epsActual)}</td>
+                    <td class="right">${fmtMoneyShort(e.revenueEstimate)}</td>
+                    <td class="right">${fmtMoneyShort(e.revenueActual)}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('earnings-pagination-info').textContent = 
+                `Showing ${start + 1}-${Math.min(end, sorted.length)} of ${sorted.length} earnings`;
+            
+            document.getElementById('earnings-prev-page').disabled = earningsCurrentPage === 1;
+            document.getElementById('earnings-next-page').disabled = end >= sorted.length;
         }
+
+        // Event listeners - Tabs
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                btn.classList.add('active');
+                document.getElementById(btn.dataset.tab + '-tab').classList.add('active');
+                
+                if (btn.dataset.tab === 'earnings' && allEarnings.length === 0) {
+                    fetchEarnings();
+                }
+            });
+        });
+
+        // Refresh buttons
+        document.getElementById('refresh-insider').addEventListener('click', fetchInsiderTrades);
+        document.getElementById('refresh-earnings').addEventListener('click', fetchEarnings);
+
+        // Insider filters
+        const debouncedApplyFilters = debounce(applyFilters, 300);
 
         document.getElementById('ticker-input').addEventListener('input', (e) => {
-            debounce(() => {
-                filters.ticker = e.target.value;
-                applyFilters();
-            }, 300);
+            filters.ticker = e.target.value;
+            debouncedApplyFilters();
         });
 
         document.getElementById('insider-input').addEventListener('input', (e) => {
-            debounce(() => {
-                filters.insider = e.target.value;
-                applyFilters();
-            }, 300);
+            filters.insider = e.target.value;
+            debouncedApplyFilters();
         });
 
-        // Amount chips
         document.querySelectorAll('[data-amount]').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('[data-amount]').forEach(b => b.setAttribute('aria-pressed', 'false'));
@@ -815,16 +1186,8 @@
                 filters.amount = btn.dataset.amount;
                 applyFilters();
             });
-
-            btn.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    btn.click();
-                }
-            });
         });
 
-        // Side chips
         document.querySelectorAll('[data-side]').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('[data-side]').forEach(b => b.setAttribute('aria-pressed', 'false'));
@@ -832,17 +1195,10 @@
                 filters.side = btn.dataset.side;
                 applyFilters();
             });
-
-            btn.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    btn.click();
-                }
-            });
         });
 
         // Sorting
-        document.querySelectorAll('th button[data-sort]').forEach(btn => {
+        document.querySelectorAll('#insider-tab th button[data-sort]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const col = btn.dataset.sort;
                 
@@ -853,10 +1209,7 @@
                     sortDirection = 'desc';
                 }
 
-                // Update UI
-                document.querySelectorAll('th button').forEach(b => {
-                    b.className = '';
-                });
+                document.querySelectorAll('#insider-tab th button').forEach(b => b.className = '');
                 btn.className = `sorted-${sortDirection}`;
 
                 updateTable();
@@ -879,18 +1232,93 @@
             }
         });
 
-        // Initialize
-        initFromURL();
-        loadData();
+        // Earnings filters
+        const debouncedApplyEarningsFilters = debounce(applyEarningsFilters, 300);
 
-        /*
-        VALIDATION CHECKLIST:
-        [✓] Filters update charts and table
-        [✓] Sticky header works
-        [✓] Sort works on three columns (Reported, Traded, Amount)
-        [✓] Pagination works
-        [✓] Mobile layout stacks correctly
-        */
+        document.getElementById('earnings-search').addEventListener('input', (e) => {
+            earningsFilters.search = e.target.value;
+            debouncedApplyEarningsFilters();
+        });
+
+        document.getElementById('earnings-from').addEventListener('change', (e) => {
+            earningsFilters.from = e.target.value;
+            fetchEarnings();
+        });
+
+        document.getElementById('earnings-to').addEventListener('change', (e) => {
+            earningsFilters.to = e.target.value;
+            fetchEarnings();
+        });
+
+        // Earnings sorting
+        document.querySelectorAll('#earnings-tab th button[data-sort]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const col = btn.dataset.sort;
+                
+                if (earningsSortColumn === col) {
+                    earningsSortDirection = earningsSortDirection === 'asc' ? 'desc' : 'asc';
+                } else {
+                    earningsSortColumn = col;
+                    earningsSortDirection = 'desc';
+                }
+
+                document.querySelectorAll('#earnings-tab th button').forEach(b => b.className = '');
+                btn.className = `sorted-${earningsSortDirection}`;
+
+                updateEarningsTable();
+            });
+        });
+
+        // Earnings pagination
+        document.getElementById('earnings-prev-page').addEventListener('click', () => {
+            if (earningsCurrentPage > 1) {
+                earningsCurrentPage--;
+                updateEarningsTable();
+            }
+        });
+
+        document.getElementById('earnings-next-page').addEventListener('click', () => {
+            const maxPage = Math.ceil(filteredEarnings.length / rowsPerPage);
+            if (earningsCurrentPage < maxPage) {
+                earningsCurrentPage++;
+                updateEarningsTable();
+            }
+        });
+
+        // CSV Download
+        document.getElementById('download-csv').addEventListener('click', () => {
+            const headers = ['Ticker', 'Date', 'EPS Estimate', 'EPS Actual', 'Revenue Estimate', 'Revenue Actual'];
+            const rows = filteredEarnings.map(e => [
+                e.symbol,
+                e.date + ' ' + (e.hour || ''),
+                e.epsEstimate || '',
+                e.epsActual || '',
+                e.revenueEstimate || '',
+                e.revenueActual || ''
+            ]);
+
+            const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'earnings_calendar.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Initialize - Set default dates for earnings
+        const today = new Date();
+        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
+        document.getElementById('earnings-from').valueAsDate = weekAgo;
+        document.getElementById('earnings-to').valueAsDate = weekFromNow;
+        earningsFilters.from = weekAgo.toISOString().split('T')[0];
+        earningsFilters.to = weekFromNow.toISOString().split('T')[0];
+
+        // Load initial data
+        fetchInsiderTrades();
     </script>
 </body>
 </html>
